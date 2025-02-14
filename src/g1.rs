@@ -24,7 +24,7 @@ cfg_if::cfg_if! {
     }
 }
 // Accelerated precompiles for zkvm. Defined directly to prevent circular dependency issues.
-#[cfg(target_os = "zkvm")]
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
 use sp1_lib::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls12381_double};
 
 /// This is an element of $\mathbb{G}_1$ represented in the affine coordinate space.
@@ -184,6 +184,7 @@ where
 impl_binops_additive!(G1Projective, G1Affine);
 impl_binops_additive_specify_output!(G1Affine, G1Projective, G1Projective);
 
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const B: Fp = Fp::from_raw_unchecked([
     0xaa27_0000_000c_fff3,
     0x53cc_0032_fc34_000a,
@@ -191,6 +192,16 @@ const B: Fp = Fp::from_raw_unchecked([
     0xb1d3_7ebe_e6ba_24d7,
     0x8ec9_733b_bf78_ab2f,
     0x09d6_4551_3d83_de7e,
+]);
+
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const B: Fp = Fp::from_raw_unchecked([
+    0x0000_0000_0000_0004,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
 ]);
 
 impl G1Affine {
@@ -205,8 +216,10 @@ impl G1Affine {
 
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
+    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     pub fn generator() -> G1Affine {
-        G1Affine {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return G1Affine {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
                 0x7817_fc67_9976_fff5,
@@ -224,7 +237,29 @@ impl G1Affine {
                 0x0bbc_3efc_5008_a26a,
             ]),
             infinity: Choice::from(0u8),
-        }
+        };
+
+        // RISCZero patch
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return G1Affine {
+            x: Fp::from_raw_unchecked([
+                0xfb3a_f00a_db22_c6bb,
+                0x6c55_e83f_f97a_1aef,
+                0xa14e_3a3f_171b_ac58,
+                0xc368_8c4f_9774_b905,
+                0x2695_638c_4fa9_ac0f,
+                0x17f1_d3a7_3197_d794,
+            ]),
+            y: Fp::from_raw_unchecked([
+                0x0caa_2329_46c5_e7e1,
+                0xd03c_c744_a288_8ae4,
+                0x00db_18cb_2c04_b3ed,
+                0xfcf5_e095_d5d0_0af6,
+                0xa09e_30ed_741d_8ae4,
+                0x08b3_f481_e3aa_a0f1,
+            ]),
+            infinity: Choice::from(0u8),
+        };
     }
 
     /// Serializes this element into compressed form. See [`notes::serialization`](crate::notes::serialization)
@@ -439,7 +474,7 @@ impl G1Affine {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                 // The add precompile only works when P != Q and P != -Q
                 if self.x != rhs.x {
                     // In this case, we know that P != Q and P != -Q, since both Q and -Q have the same `x` coordinate
@@ -486,7 +521,7 @@ impl G1Affine {
             return self;
         }
         cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                 self.x.mul_r_inv_internal();
                 self.y.mul_r_inv_internal();
                 unsafe {
@@ -505,6 +540,7 @@ impl G1Affine {
 }
 
 /// A nontrivial third root of unity in Fp
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 pub const BETA: Fp = Fp::from_raw_unchecked([
     0x30f1_361b_798a_64e8,
     0xf3b8_ddab_7ece_5a2a,
@@ -514,7 +550,17 @@ pub const BETA: Fp = Fp::from_raw_unchecked([
     0x051b_a4ab_241b_6160,
 ]);
 
-pub fn endomorphism(p: &G1Affine) -> G1Affine {
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+pub const BETA: Fp = Fp::from_raw_unchecked([
+    0x2e01_ffff_fffe_fffe,
+    0xde17_d813_620a_0002,
+    0xddb3_a93b_e6f8_9688,
+    0xba69_c607_6a0f_77ea,
+    0x5f19_672f_df76_ce51,
+    0x0000_0000_0000_0000,
+]);
+
+fn endomorphism(p: &G1Affine) -> G1Affine {
     // Endomorphism of the points on the curve.
     // endomorphism_p(x,y) = (BETA * x, y)
     // where BETA is a non-trivial cubic root of unity in Fq.
@@ -700,7 +746,8 @@ impl G1Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G1Projective {
-        G1Projective {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return G1Projective {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
                 0x7817_fc67_9976_fff5,
@@ -718,7 +765,29 @@ impl G1Projective {
                 0x0bbc_3efc_5008_a26a,
             ]),
             z: Fp::one(),
-        }
+        };
+
+        // RISCZero patch
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return G1Projective {
+            x: Fp::from_raw_unchecked([
+                0xfb3a_f00a_db22_c6bb,
+                0x6c55_e83f_f97a_1aef,
+                0xa14e_3a3f_171b_ac58,
+                0xc368_8c4f_9774_b905,
+                0x2695_638c_4fa9_ac0f,
+                0x17f1_d3a7_3197_d794,
+            ]),
+            y: Fp::from_raw_unchecked([
+                0x0caa_2329_46c5_e7e1,
+                0xd03c_c744_a288_8ae4,
+                0x00db_18cb_2c04_b3ed,
+                0xfcf5_e095_d5d0_0af6,
+                0xa09e_30ed_741d_8ae4,
+                0x08b3_f481_e3aa_a0f1,
+            ]),
+            z: Fp::one(),
+        };
     }
 
     /// Computes the doubling of this point.
@@ -861,46 +930,49 @@ impl G1Projective {
     }
 
     /// Multiply `self` by `crate::BLS_X`, using double and add.
-    #[cfg(not(target_os = "zkvm"))]
     fn mul_by_x(&self) -> G1Projective {
-        let mut xself = G1Projective::identity();
-        // NOTE: in BLS12-381 we can just skip the first bit.
-        let mut x = crate::BLS_X >> 1;
-        let mut tmp = *self;
-        while x != 0 {
-            tmp = tmp.double();
+        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        {
+            let mut xself = G1Projective::identity();
+            // NOTE: in BLS12-381 we can just skip the first bit.
+            let mut x = crate::BLS_X >> 1;
+            let mut tmp = *self;
+            while x != 0 {
+                tmp = tmp.double();
 
-            if x % 2 == 1 {
-                xself += tmp;
+                if x % 2 == 1 {
+                    xself += tmp;
+                }
+                x >>= 1;
             }
-            x >>= 1;
-        }
-        // finally, flip the sign
-        if crate::BLS_X_IS_NEGATIVE {
-            xself = -xself;
-        }
-        xself
-    }
-
-    #[cfg(target_os = "zkvm")]
-    fn mul_by_x(&self) -> G1Projective {
-        let mut xself = G1Affine::identity();
-
-        let mut x = crate::BLS_X >> 1;
-        let mut tmp = G1Affine::from(*self);
-        while x != 0 {
-            tmp = tmp.double();
-
-            if x % 2 == 1 {
-                xself = xself.add_affine(&tmp);
+            // finally, flip the sign
+            if crate::BLS_X_IS_NEGATIVE {
+                xself = -xself;
             }
-            x >>= 1;
+            xself
         }
-        // finally, flip the sign
-        if crate::BLS_X_IS_NEGATIVE {
-            xself = -xself;
+
+        // SP1 patch
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            let mut xself = G1Affine::identity();
+
+            let mut x = crate::BLS_X >> 1;
+            let mut tmp = G1Affine::from(*self);
+            while x != 0 {
+                tmp = tmp.double();
+
+                if x % 2 == 1 {
+                    xself = xself.add_affine(&tmp);
+                }
+                x >>= 1;
+            }
+            // finally, flip the sign
+            if crate::BLS_X_IS_NEGATIVE {
+                xself = -xself;
+            }
+            xself.into()
         }
-        xself.into()
     }
 
     /// Multiplies by $(1 - z)$, where $z$ is the parameter of BLS12-381, which

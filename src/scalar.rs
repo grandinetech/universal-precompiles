@@ -8,7 +8,7 @@ use ff::{Field, PrimeField};
 use rand_core::RngCore;
 
 cfg_if! {
-    if #[cfg(target_os = "zkvm")] {
+    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
         use sp1_lib::sys_bigint;
         use sp1_lib::{io::{hint_slice, read_vec}, unconstrained};
     }
@@ -19,7 +19,13 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 #[cfg(feature = "bits")]
 use ff::{FieldBits, PrimeFieldBits};
 
-use crate::util::{adc, mac, sbb};
+use crate::util::{adc, sbb};
+
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+use crate::util::mac;
+
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+use risc0_bigint2::field;
 
 /// Represents an element of the scalar field $\mathbb{F}_q$ of the BLS12-381 elliptic
 /// curve construction.
@@ -48,7 +54,11 @@ impl fmt::Display for Scalar {
 
 impl From<u64> for Scalar {
     fn from(val: u64) -> Scalar {
-        Scalar([val, 0, 0, 0]) * R2
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return Scalar([val, 0, 0, 0]) * R2;
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return Scalar([val, 0, 0, 0]); 
     }
 }
 
@@ -89,7 +99,7 @@ const MODULUS: Scalar = Scalar([
 ]);
 
 /// The modulus as u32 limbs.
-#[cfg(target_os = "zkvm")]
+#[cfg(any(all(feature = "bits", not(target_pointer_width = "64"))), all(target_os = "zkvm", target_vendor = "succinct"))]
 const MODULUS_LIMBS_32: [u32; 8] = [
     0x0000_0001,
     0xffff_ffff,
@@ -101,7 +111,7 @@ const MODULUS_LIMBS_32: [u32; 8] = [
     0x73ed_a753,
 ];
 
-#[cfg(target_os = "zkvm")]
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
 const R_INV: [u32; 8] = [
     0xfe75_c040,
     0x13f7_5b69,
@@ -117,6 +127,7 @@ const R_INV: [u32; 8] = [
 const MODULUS_BITS: u32 = 255;
 
 // GENERATOR = 7 (multiplicative generator of r-1 order, that is also quadratic nonresidue)
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const GENERATOR: Scalar = Scalar([
     0x0000_000e_ffff_fff1,
     0x17e3_63d3_0018_9c0f,
@@ -124,7 +135,15 @@ const GENERATOR: Scalar = Scalar([
     0x3513_3220_8fc5_a8c4,
 ]);
 
-impl Neg for &Scalar {
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const GENERATOR: Scalar = Scalar([
+    0x0000_0000_0000_0007,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
+    0x0000_0000_0000_0000,
+]);
+
+impl<'a> Neg for &'a Scalar {
     type Output = Scalar;
 
     #[inline]
@@ -173,6 +192,7 @@ impl_binops_additive!(Scalar, Scalar);
 impl_binops_multiplicative!(Scalar, Scalar);
 
 /// INV = -(q^{-1} mod 2^64) mod 2^64
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const INV: u64 = 0xffff_fffe_ffff_ffff;
 
 /// R = 2^256 mod q
@@ -192,6 +212,7 @@ const R2: Scalar = Scalar([
 ]);
 
 /// R^3 = 2^768 mod q
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const R3: Scalar = Scalar([
     0xc62c_1807_439b_73af,
     0x1b3e_0d18_8cf0_6990,
@@ -200,11 +221,20 @@ const R3: Scalar = Scalar([
 ]);
 
 /// 2^-1
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const TWO_INV: Scalar = Scalar([
     0x0000_0000_ffff_ffff,
     0xac42_5bfd_0001_a401,
     0xccc6_27f7_f65e_27fa,
     0x0c12_58ac_d662_82b7,
+]);
+
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const TWO_INV: Scalar = Scalar([
+    0x7fff_ffff_8000_0001,
+    0xa9de_d201_7fff_2dff,
+    0x199c_ec04_04d0_ec02,
+    0x39f6_d3a9_94ce_bea4,
 ]);
 
 // 2^S * t = MODULUS - 1 with t odd
@@ -217,6 +247,7 @@ const S: u32 = 32;
 /// `GENERATOR = 7 mod q` is a generator
 /// of the q - 1 order multiplicative
 /// subgroup.
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const ROOT_OF_UNITY: Scalar = Scalar([
     0xb9b5_8d8c_5f0e_466a,
     0x5b1b_4c80_1819_d7ec,
@@ -224,7 +255,16 @@ const ROOT_OF_UNITY: Scalar = Scalar([
     0x5bf3_adda_19e9_b27b,
 ]);
 
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const ROOT_OF_UNITY: Scalar = Scalar([
+    0x3829_971f_439f_0d2b,
+    0xb636_8350_8c22_80b9,
+    0xd09b_6819_22c8_13b4,
+    0x16a2_a19e_dfe8_1f20,
+]);
+
 /// ROOT_OF_UNITY^-1
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const ROOT_OF_UNITY_INV: Scalar = Scalar([
     0x4256_481a_dcf3_219a,
     0x45f3_7b7f_96b6_cad3,
@@ -232,13 +272,30 @@ const ROOT_OF_UNITY_INV: Scalar = Scalar([
     0x2d2f_c049_658a_fd43,
 ]);
 
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const ROOT_OF_UNITY_INV: Scalar = Scalar([
+    0x0fb4_d6e1_3cf1_9a78,
+    0x6f67_d4a2_b566_f833,
+    0xed4f_2f74_a35d_0168,
+    0x0538_a6f6_6e19_c653,
+]);
+
 /// GENERATOR^{2^s} where t * 2^s + 1 = q with t odd.
 /// In other words, this is a t root of unity.
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const DELTA: Scalar = Scalar([
     0x70e3_10d3_d146_f96a,
     0x4b64_c089_19e2_99e6,
     0x51e1_1418_6a8b_970d,
     0x6185_d066_27c0_67cb,
+]);
+
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const DELTA: Scalar = Scalar([
+    0x6c08_3479_5901_89d7,
+    0xf650_2437_c6a0_9c00,
+    0x43ca_b354_fabb_0062,
+    0x0863_4d0a_a021_aaf8,
 ]);
 
 impl Default for Scalar {
@@ -261,12 +318,17 @@ impl Scalar {
     /// Returns one, the multiplicative identity.
     #[inline]
     pub const fn one() -> Scalar {
-        R
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return R;
+
+        /// RISCZero patch: Non-Montgomery.
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return Scalar([1, 0, 0, 0]);
     }
 
     /// Doubles this field element.
     #[inline]
-    pub const fn double(&self) -> Scalar {
+    pub fn double(&self) -> Scalar {
         // TODO: This can be achieved more efficiently with a bitshift.
         self.add(self)
     }
@@ -294,7 +356,10 @@ impl Scalar {
 
         // Convert to Montgomery form by computing
         // (a.R^0 * R^2) / R = a.R
-        tmp *= &R2;
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        {
+            tmp *= &R2;
+        }
 
         CtOption::new(tmp, Choice::from(is_some))
     }
@@ -304,7 +369,11 @@ impl Scalar {
     pub fn to_bytes(&self) -> [u8; 32] {
         // Turn into canonical form by computing
         // (a.R) / R = a
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         let tmp = Scalar::montgomery_reduce(self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0);
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        let tmp = self;
 
         let mut res = [0; 32];
         res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
@@ -347,15 +416,25 @@ impl Scalar {
         let d0 = Scalar([limbs[0], limbs[1], limbs[2], limbs[3]]);
         let d1 = Scalar([limbs[4], limbs[5], limbs[6], limbs[7]]);
         // Convert to Montgomery form
-        d0 * R2 + d1 * R3
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return d0 * R2 + d1 * R3;
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))] //TODO: untested
+        return d0 * R + d1 * R2;
     }
 
     /// Converts from an integer represented in little endian
     /// into its (congruent) `Scalar` representation.
-    pub fn from_raw(val: [u64; 4]) -> Self {
-        Scalar(val).mul(&R2)
+    pub const fn from_raw(val: [u64; 4]) -> Self {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return (&Scalar(val)).mul(&R2);
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return Scalar(val);
     }
 
+    /// Squares this element.
+    #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
     #[inline]
     /// CPU version of the square operation. Necessary to prevent syscalls in unconstrained mode.
     fn cpu_square(&self) -> Scalar {
@@ -388,17 +467,25 @@ impl Scalar {
         Scalar::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
     }
 
-    /// Squares this element.
-    #[inline]
     pub fn square(&self) -> Scalar {
-        cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
-                let mut res = *self;
-                res.mul_inp(self);
-                res
-            } else {
-                self.cpu_square()
-            }
+        #[cfg(not(target_os = "zkvm"))]
+        return self.cpu_square();
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        {
+            let mut result = [0u32; 8];
+            let inp: [u32; 8] = bytemuck::cast(self.0);
+            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+            field::modmul_256(&inp, &inp, &prime, &mut result);
+            let ret: [u64; 4] = bytemuck::cast(result);
+            Scalar(ret)
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            let mut res = *self;
+            res.mul_inp(self);
+            res
         }
     }
 
@@ -538,7 +625,24 @@ impl Scalar {
     }
 
     pub fn invert(&self) -> CtOption<Self> {
-        #[cfg(target_os = "zkvm")]
+        #[cfg(not(target_os = "zkvm"))]
+        return self.cpu_invert();
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        {
+            /// RISCZero patch: non-Montgomery mult
+            if self.is_zero().into() {
+                return CtOption::new(Scalar::zero(), Choice::from(0u8));
+            }
+            let mut result = [0u32; 8];
+            let lhs: [u32; 8] = bytemuck::cast(self.0);
+            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+            field::modinv_256(&lhs, &prime, &mut result);
+            let ret: [u64; 4] = bytemuck::cast(result);
+            CtOption::new(Scalar(ret), Choice::from(1u8))
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
         {
             if self.is_zero().into() {
                 return CtOption::new(Self::zero(), Choice::from(0u8));
@@ -562,16 +666,12 @@ impl Scalar {
             let inv = Scalar::from_bytes(bytes).unwrap();
 
             assert!(self * &inv == Scalar::one(), "Invalid hint: Scalar invert");
-            return CtOption::new(inv, Choice::from(1u8));
-        }
-        #[cfg(not(target_os = "zkvm"))]
-        {
-            self.cpu_invert()
+            CtOption::new(inv, Choice::from(1u8))
         }
     }
 
     #[inline(always)]
-    pub const fn montgomery_reduce(
+    pub fn montgomery_reduce(
         r0: u64,
         r1: u64,
         r2: u64,
@@ -619,7 +719,7 @@ impl Scalar {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub(crate) fn mul_r_inv_internal(&mut self) {
         unsafe {
             sys_bigint(
@@ -635,7 +735,7 @@ impl Scalar {
     #[inline]
     pub fn mul_inp(&mut self, rhs: &Scalar) {
         cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                 unsafe {
                     sys_bigint(
                         self.0.as_mut_ptr() as *mut[u32; 8],
@@ -680,17 +780,27 @@ impl Scalar {
         Scalar::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
     }
 
-    /// Multiplies `rhs` by `self`, returning the result.
     #[inline]
     pub fn mul(&self, rhs: &Self) -> Self {
-        cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
-                let mut res = *self;
-                res.mul_inp(rhs);
-                res
-            } else {
-                self.cpu_mul(rhs)
-            }
+        #[cfg(not(target_os = "zkvm"))]
+        return self.cpu_mul(rhs);
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        {
+            let mut result = [0u32; 8];
+            let lhs: [u32; 8] = bytemuck::cast(self.0);
+            let rhs: [u32; 8] = bytemuck::cast(rhs.0);
+            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+            field::modmul_256(&lhs, &rhs, &prime, &mut result);
+            let ret: [u64; 4] = bytemuck::cast(result);
+            Scalar(ret)
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            let mut res = *self;
+            res.mul_inp(rhs);
+            res
         }
     }
 
@@ -715,16 +825,31 @@ impl Scalar {
     /// Adds `rhs` to `self`, returning the result.
     #[inline]
     pub const fn add(&self, rhs: &Self) -> Self {
-        let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
-        let (d1, carry) = adc(self.0[1], rhs.0[1], carry);
-        let (d2, carry) = adc(self.0[2], rhs.0[2], carry);
-        let (d3, _) = adc(self.0[3], rhs.0[3], carry);
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        {
+            let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
+            let (d1, carry) = adc(self.0[1], rhs.0[1], carry);
+            let (d2, carry) = adc(self.0[2], rhs.0[2], carry);
+            let (d3, _) = adc(self.0[3], rhs.0[3], carry);
 
-        // Attempt to subtract the modulus, to ensure the value
-        // is smaller than the modulus.
+            // Attempt to subtract the modulus, to ensure the value
+            // is smaller than the modulus.
 
-        #[allow(clippy::needless_borrow)]
-        (&Scalar([d0, d1, d2, d3])).sub(&MODULUS)
+            #[allow(clippy::needless_borrow)]
+            (&Scalar([d0, d1, d2, d3])).sub(&MODULUS)
+        }
+
+        /// RISCZero patch
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        {
+            let mut result = [0u32; 8];
+            let lhs: [u32; 8] = bytemuck::cast(self.0);
+            let rhs: [u32; 8] = bytemuck::cast(rhs.0);
+            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+            field::modadd_256(&lhs, &rhs, &prime, &mut result);
+            let ret: [u64; 4] = bytemuck::cast(result);
+            Scalar(ret)
+        }
     }
 
     /// Negates `self`.
