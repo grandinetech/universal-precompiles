@@ -17,6 +17,7 @@
 //#![deny(unsafe_code)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::many_single_char_names)]
+#![allow(unexpected_cfgs)]
 // This lint is described at
 // https://rust-lang.github.io/rust-clippy/master/index.html#suspicious_arithmetic_impl
 // In our library, some of the arithmetic involving extension fields will necessarily

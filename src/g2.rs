@@ -174,6 +174,7 @@ where
 impl_binops_additive!(G2Projective, G2Affine);
 impl_binops_additive_specify_output!(G2Affine, G2Projective, G2Projective);
 
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0xaa27_0000_000c_fff3,
@@ -193,6 +194,27 @@ const B: Fp2 = Fp2 {
     ]),
 };
 
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const B: Fp2 = Fp2 {
+    c0: Fp::from_raw_unchecked([
+        0x0000_0000_0000_0004,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+    ]),
+    c1: Fp::from_raw_unchecked([
+        0x0000_0000_0000_0004,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+    ]),
+};
+
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const B3: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         4933130441833534766,
@@ -212,6 +234,26 @@ const B3: Fp2 = Fp2 {
     ]),
 };
 
+#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+const B3: Fp2 = Fp2 {
+    c0: Fp::from_raw_unchecked([
+        0x0000_0000_0000_000C,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+    ]),
+    c1: Fp::from_raw_unchecked([
+        0x0000_0000_0000_000C,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+        0x0000_0000_0000_0000,
+    ]),
+};
+
 impl G2Affine {
     /// Returns the identity of the group: the point at infinity.
     pub fn identity() -> G2Affine {
@@ -225,7 +267,8 @@ impl G2Affine {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G2Affine {
-        G2Affine {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return G2Affine {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
                     0xf5f2_8fa2_0294_0a10,
@@ -263,7 +306,48 @@ impl G2Affine {
                 ]),
             },
             infinity: Choice::from(0u8),
-        }
+        };
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return G2Affine {
+            x: Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0xd480_56c8_c121_bdb8,
+                    0x0bac_0326_a805_bbef,
+                    0xb451_0b64_7ae3_d177,
+                    0xc6e4_7ad4_fa40_3b02,
+                    0x2608_0527_2dc5_1051,
+                    0x024a_a2b2_f08f_0a91,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0xe5ac_7d05_5d04_2b7e,
+                    0x334c_f112_1394_5d57,
+                    0xb5da_61bb_dc7f_5049,
+                    0x596b_d0d0_9920_b61a,
+                    0x7dac_d3a0_8827_4f65,
+                    0x13e0_2b60_5271_9f60,
+                ]),
+            },
+            y: Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0xe193_5486_08b8_2801,
+                    0x923a_c9cc_3bac_a289,
+                    0x6d42_9a69_5160_d12c,
+                    0xadfd_9baa_8cbd_d3a7,
+                    0x8cc9_cdc6_da2e_351a,
+                    0x0ce5_d527_727d_6e11,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0xaaa9_075f_f05f_79be,
+                    0x3f37_0d27_5cec_1da1,
+                    0x2674_92ab_572e_99ab,
+                    0xcb3e_287e_85a7_63af,
+                    0x32ac_d2b0_2bc2_8b99,
+                    0x0606_c4a0_2ea7_34cc,
+                ]),
+            },
+            infinity: Choice::from(0u8),
+        };
     }
 
     /// Serializes this element into compressed form. See [`notes::serialization`](crate::notes::serialization)
@@ -669,7 +753,7 @@ fn mul_by_3b(x: &Fp2) -> Fp2 {
 }
 
 #[inline]
-#[cfg(target_os = "zkvm")]
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
 fn mul_by_3b_inp(x: &mut Fp2) {
     x.mul_inp(&B3);
 }
@@ -687,7 +771,8 @@ impl G2Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G2Projective {
-        G2Projective {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        return G2Projective {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
                     0xf5f2_8fa2_0294_0a10,
@@ -725,174 +810,223 @@ impl G2Projective {
                 ]),
             },
             z: Fp2::one(),
-        }
+        };
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        return G2Projective {
+            x: Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0xd480_56c8_c121_bdb8,
+                    0x0bac_0326_a805_bbef,
+                    0xb451_0b64_7ae3_d177,
+                    0xc6e4_7ad4_fa40_3b02,
+                    0x2608_0527_2dc5_1051,
+                    0x024a_a2b2_f08f_0a91,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0xe5ac_7d05_5d04_2b7e,
+                    0x334c_f112_1394_5d57,
+                    0xb5da_61bb_dc7f_5049,
+                    0x596b_d0d0_9920_b61a,
+                    0x7dac_d3a0_8827_4f65,
+                    0x13e0_2b60_5271_9f60,
+                ]),
+            },
+            y: Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0xe193_5486_08b8_2801,
+                    0x923a_c9cc_3bac_a289,
+                    0x6d42_9a69_5160_d12c,
+                    0xadfd_9baa_8cbd_d3a7,
+                    0x8cc9_cdc6_da2e_351a,
+                    0x0ce5_d527_727d_6e11,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0xaaa9_075f_f05f_79be,
+                    0x3f37_0d27_5cec_1da1,
+                    0x2674_92ab_572e_99ab,
+                    0xcb3e_287e_85a7_63af,
+                    0x32ac_d2b0_2bc2_8b99,
+                    0x0606_c4a0_2ea7_34cc,
+                ]),
+            },
+            z: Fp2::one(),
+        };
     }
 
     /// Computes the doubling of this point.
     pub fn double(&self) -> G2Projective {
-        // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
+        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        {
+            // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
+            let t0 = self.y.square();
+            let z3 = t0 + t0;
+            let z3 = z3 + z3;
+            let z3 = z3 + z3;
+            let t1 = self.y * self.z;
+            let t2 = self.z.square();
+            let t2 = mul_by_3b(&t2);
+            let x3 = t2 * z3;
+            let y3 = t0 + t2;
+            let z3 = t1 * z3;
+            let t1 = t2 + t2;
+            let t2 = t1 + t2;
+            let t0 = t0 - t2;
+            let y3 = t0 * y3;
+            let y3 = x3 + y3;
+            let t1 = self.x * self.y;
+            let x3 = t0 * t1;
+            let x3 = x3 + x3;
 
-        cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
-                let mut t0 = self.y.square();
-                let mut z3 = t0;
-                z3.double_inp();
-                z3.double_inp();
-                z3.double_inp();
-                let mut t2 = self.z.square();
-                mul_by_3b_inp(&mut t2);
-                let mut x3 = t2;
-                x3.mul_inp(&z3);
-                let mut y3 = t0;
-                y3.add_inp(&t2);
-                z3.mul_inp(&self.y);
-                z3.mul_inp(&self.z);
-                let tmp = t2;
-                t2.double_inp();
-                t2.add_inp(&tmp);
-                t0.sub_inp(&t2);
-                y3.mul_inp(&t0);
-                y3.add_inp(&x3);
-                t0.mul_inp(&self.x);
-                t0.mul_inp(&self.y);
-                t0.double_inp();
+            let tmp = G2Projective {
+                x: x3,
+                y: y3,
+                z: z3,
+            };
 
-                let tmp = G2Projective {
-                    x: t0,
-                    y: y3,
-                    z: z3,
-                };
-            } else {
-                let t0 = self.y.square();
-                let z3 = t0 + t0;
-                let z3 = z3 + z3;
-                let z3 = z3 + z3;
-                let t1 = self.y * self.z;
-                let t2 = self.z.square();
-                let t2 = mul_by_3b(&t2);
-                let x3 = t2 * z3;
-                let y3 = t0 + t2;
-                let z3 = t1 * z3;
-                let t1 = t2 + t2;
-                let t2 = t1 + t2;
-                let t0 = t0 - t2;
-                let y3 = t0 * y3;
-                let y3 = x3 + y3;
-                let t1 = self.x * self.y;
-                let x3 = t0 * t1;
-                let x3 = x3 + x3;
-
-                let tmp = G2Projective {
-                    x: x3,
-                    y: y3,
-                    z: z3,
-                };
-            }
+            G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
         }
 
-        G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
+        // SP1
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
+            let mut t0 = self.y.square();
+            let mut z3 = t0;
+            z3.double_inp();
+            z3.double_inp();
+            z3.double_inp();
+            let mut t2 = self.z.square();
+            mul_by_3b_inp(&mut t2);
+            let mut x3 = t2;
+            x3.mul_inp(&z3);
+            let mut y3 = t0;
+            y3.add_inp(&t2);
+            z3.mul_inp(&self.y);
+            z3.mul_inp(&self.z);
+            let tmp = t2;
+            t2.double_inp();
+            t2.add_inp(&tmp);
+            t0.sub_inp(&t2);
+            y3.mul_inp(&t0);
+            y3.add_inp(&x3);
+            t0.mul_inp(&self.x);
+            t0.mul_inp(&self.y);
+            t0.double_inp();
+
+            let tmp = G2Projective {
+                x: t0,
+                y: y3,
+                z: z3,
+            };
+
+            G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
+        }
     }
 
     /// Adds this point to another point.
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
-        // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
+        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        {
+            // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
+            let t0 = self.x * rhs.x;
+            let t1 = self.y * rhs.y;
+            let t2 = self.z * rhs.z;
+            let t3 = self.x + self.y;
+            let t4 = rhs.x + rhs.y;
+            let t3 = t3 * t4;
+            let t4 = t0 + t1;
+            let t3 = t3 - t4;
+            let t4 = self.y + self.z;
+            let x3 = rhs.y + rhs.z;
+            let t4 = t4 * x3;
+            let x3 = t1 + t2;
+            let t4 = t4 - x3;
+            let x3 = self.x + self.z;
+            let y3 = rhs.x + rhs.z;
+            let x3 = x3 * y3;
+            let y3 = t0 + t2;
+            let y3 = x3 - y3;
+            let x3 = t0 + t0;
+            let t0 = x3 + t0;
+            let t2 = mul_by_3b(&t2);
+            let z3 = t1 + t2;
+            let t1 = t1 - t2;
+            let y3 = mul_by_3b(&y3);
+            let x3 = t4 * y3;
+            let t2 = t3 * t1;
+            let x3 = t2 - x3;
+            let y3 = y3 * t0;
+            let t1 = t1 * z3;
+            let y3 = t1 + y3;
+            let t0 = t0 * t3;
+            let z3 = z3 * t4;
+            let z3 = z3 + t0;
 
-        cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
-                let mut t0 = self.x;
-                t0.mul_inp(&rhs.x);
-                let mut t1 = self.y;
-                t1.mul_inp(&rhs.y);
-                let mut t2 = self.z;
-                t2.mul_inp(&rhs.z);
-                let mut t3 = self.x;
-                t3.add_inp(&self.y);
-                let mut t4 = rhs.x;
-                t4.add_inp(&rhs.y);
-                t3.mul_inp(&t4);
-                t3.sub_inp(&t0);
-                t3.sub_inp(&t1);
-                let mut t4 = self.y;
-                t4.add_inp(&self.z);
-                let mut x3 = rhs.y;
-                x3.add_inp(&rhs.z);
-                t4.mul_inp(&x3);
-                t4.sub_inp(&t1);
-                t4.sub_inp(&t2);
-                let mut x3 = self.x;
-                x3.add_inp(&self.z);
-                let mut y3 = rhs.x;
-                y3.add_inp(&rhs.z);
-                x3.mul_inp(&y3);
-                let mut y3 = -t0;
-                y3.sub_inp(&t2);
-                y3.add_inp(&x3);
-                let mut x3 = t0;
-                x3.double_inp();
-                t0.add_inp(&x3);
-                mul_by_3b_inp(&mut t2);
-                let mut z3 = t1;
-                z3.add_inp(&t2);
-                t1.sub_inp(&t2);
-                mul_by_3b_inp(&mut y3);
-                let mut x3 = t4;
-                x3.mul_inp(&y3);
-                let mut t2 = t3;
-                t2.mul_inp(&t1);
-                x3 = -x3;
-                x3.add_inp(&t2);
-                y3.mul_inp(&t0);
-                t1.mul_inp(&z3);
-                y3.add_inp(&t1);
-                t0.mul_inp(&t3);
-                z3.mul_inp(&t4);
-                z3.add_inp(&t0);
+            G2Projective {
+                x: x3,
+                y: y3,
+                z: z3,
+            }
+        }
 
-                G2Projective {
-                    x: x3,
-                    y: y3,
-                    z: z3,
-                }
-            } else {
-                let t0 = self.x * rhs.x;
-                let t1 = self.y * rhs.y;
-                let t2 = self.z * rhs.z;
-                let t3 = self.x + self.y;
-                let t4 = rhs.x + rhs.y;
-                let t3 = t3 * t4;
-                let t4 = t0 + t1;
-                let t3 = t3 - t4;
-                let t4 = self.y + self.z;
-                let x3 = rhs.y + rhs.z;
-                let t4 = t4 * x3;
-                let x3 = t1 + t2;
-                let t4 = t4 - x3;
-                let x3 = self.x + self.z;
-                let y3 = rhs.x + rhs.z;
-                let x3 = x3 * y3;
-                let y3 = t0 + t2;
-                let y3 = x3 - y3;
-                let x3 = t0 + t0;
-                let t0 = x3 + t0;
-                let t2 = mul_by_3b(&t2);
-                let z3 = t1 + t2;
-                let t1 = t1 - t2;
-                let y3 = mul_by_3b(&y3);
-                let x3 = t4 * y3;
-                let t2 = t3 * t1;
-                let x3 = t2 - x3;
-                let y3 = y3 * t0;
-                let t1 = t1 * z3;
-                let y3 = t1 + y3;
-                let t0 = t0 * t3;
-                let z3 = z3 * t4;
-                let z3 = z3 + t0;
+        // SP1 patch
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
+            let mut t0 = self.x;
+            t0.mul_inp(&rhs.x);
+            let mut t1 = self.y;
+            t1.mul_inp(&rhs.y);
+            let mut t2 = self.z;
+            t2.mul_inp(&rhs.z);
+            let mut t3 = self.x;
+            t3.add_inp(&self.y);
+            let mut t4 = rhs.x;
+            t4.add_inp(&rhs.y);
+            t3.mul_inp(&t4);
+            t3.sub_inp(&t0);
+            t3.sub_inp(&t1);
+            let mut t4 = self.y;
+            t4.add_inp(&self.z);
+            let mut x3 = rhs.y;
+            x3.add_inp(&rhs.z);
+            t4.mul_inp(&x3);
+            t4.sub_inp(&t1);
+            t4.sub_inp(&t2);
+            let mut x3 = self.x;
+            x3.add_inp(&self.z);
+            let mut y3 = rhs.x;
+            y3.add_inp(&rhs.z);
+            x3.mul_inp(&y3);
+            let mut y3 = -t0;
+            y3.sub_inp(&t2);
+            y3.add_inp(&x3);
+            let mut x3 = t0;
+            x3.double_inp();
+            t0.add_inp(&x3);
+            mul_by_3b_inp(&mut t2);
+            let mut z3 = t1;
+            z3.add_inp(&t2);
+            t1.sub_inp(&t2);
+            mul_by_3b_inp(&mut y3);
+            let mut x3 = t4;
+            x3.mul_inp(&y3);
+            let mut t2 = t3;
+            t2.mul_inp(&t1);
+            x3 = -x3;
+            x3.add_inp(&t2);
+            y3.mul_inp(&t0);
+            t1.mul_inp(&z3);
+            y3.add_inp(&t1);
+            t0.mul_inp(&t3);
+            z3.mul_inp(&t4);
+            z3.add_inp(&t0);
 
-                G2Projective {
-                    x: x3,
-                    y: y3,
-                    z: z3,
-                }
+            G2Projective {
+                x: x3,
+                y: y3,
+                z: z3,
             }
         }
     }
@@ -959,51 +1093,99 @@ impl G2Projective {
         acc
     }
 
-    pub fn psi(&self) -> G2Projective {
-        // 1 / ((u+1) ^ ((q-1)/3))
-        let psi_coeff_x = Fp2 {
-            c0: Fp::zero(),
-            c1: Fp::from_raw_unchecked([
-                0x890dc9e4867545c3,
-                0x2af322533285a5d5,
-                0x50880866309b7e2c,
-                0xa20d1b8c7e881024,
-                0x14e4f04fe2db9068,
-                0x14e56d3f1564853a,
-            ]),
-        };
-        // 1 / ((u+1) ^ (p-1)/2)
-        let psi_coeff_y = Fp2 {
-            c0: Fp::from_raw_unchecked([
-                0x3e2f585da55c9ad1,
-                0x4294213d86c18183,
-                0x382844c88b623732,
-                0x92ad2afd19103e18,
-                0x1d794e4fac7cf0b9,
-                0x0bd592fc7d825ec8,
-            ]),
-            c1: Fp::from_raw_unchecked([
-                0x7bcfa7a25aa30fda,
-                0xdc17dec12a927e7c,
-                0x2f088dd86b4ebef1,
-                0xd1ca2087da74d4a7,
-                0x2da2596696cebc1d,
-                0x0e2b7eedbbfd87d2,
-            ]),
-        };
+    fn psi(&self) -> G2Projective {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        {
+            // 1 / ((u+1) ^ ((q-1)/3))
+            let psi_coeff_x = Fp2 {
+                c0: Fp::zero(),
+                c1: Fp::from_raw_unchecked([
+                    0x890dc9e4867545c3,
+                    0x2af322533285a5d5,
+                    0x50880866309b7e2c,
+                    0xa20d1b8c7e881024,
+                    0x14e4f04fe2db9068,
+                    0x14e56d3f1564853a,
+                ]),
+            };
+            // 1 / ((u+1) ^ (p-1)/2)
+            let psi_coeff_y = Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0x3e2f585da55c9ad1,
+                    0x4294213d86c18183,
+                    0x382844c88b623732,
+                    0x92ad2afd19103e18,
+                    0x1d794e4fac7cf0b9,
+                    0x0bd592fc7d825ec8,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0x7bcfa7a25aa30fda,
+                    0xdc17dec12a927e7c,
+                    0x2f088dd86b4ebef1,
+                    0xd1ca2087da74d4a7,
+                    0x2da2596696cebc1d,
+                    0x0e2b7eedbbfd87d2,
+                ]),
+            };
 
-        G2Projective {
-            // x = frobenius(x)/((u+1)^((p-1)/3))
-            x: self.x.frobenius_map() * psi_coeff_x,
-            // y = frobenius(y)/(u+1)^((p-1)/2)
-            y: self.y.frobenius_map() * psi_coeff_y,
-            // z = frobenius(z)
-            z: self.z.frobenius_map(),
+            G2Projective {
+                // x = frobenius(x)/((u+1)^((p-1)/3))
+                x: self.x.frobenius_map() * psi_coeff_x,
+                // y = frobenius(y)/(u+1)^((p-1)/2)
+                y: self.y.frobenius_map() * psi_coeff_y,
+                // z = frobenius(z)
+                z: self.z.frobenius_map(),
+            }
+        }
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        {
+            // 1 / ((u+1) ^ ((q-1)/3))
+            let psi_coeff_x = Fp2 {
+                c0: Fp::zero(),
+                c1: Fp::from_raw_unchecked([
+                    0x8bfd_0000_0000_aaad,
+                    0x4094_27eb_4f49_fffd,
+                    0x897d_2965_0fb8_5f9b,
+                    0xaa0d_857d_8975_9ad4,
+                    0xec02_4086_63d4_de85,
+                    0x1a01_11ea_397f_e699,
+                ]),
+            };
+            // 1 / ((u+1) ^ (p-1)/2)
+            let psi_coeff_y = Fp2 {
+                c0: Fp::from_raw_unchecked([
+                    0xf1ee_7b04_121b_dea2,
+                    0x3044_66cf_3e67_fa0a,
+                    0xef39_6489_f61e_b45e,
+                    0x1c3d_edd9_30b1_cf60,
+                    0xe2e9_c448_d77a_2cd9,
+                    0x1352_03e6_0180_a68e,
+                ]),
+                c1: Fp::from_raw_unchecked([
+                    0xc810_84fb_ede3_cc09,
+                    0xee67_992f_72ec_05f4,
+                    0x77f7_6e17_0092_41c5,
+                    0x4839_5dab_c2d3_435e,
+                    0x6831_e36d_6bd1_7ffe,
+                    0x06af_0e04_37ff_400b,
+                ]),
+            };
+
+            G2Projective {
+                // x = frobenius(x)/((u+1)^((p-1)/3))
+                x: self.x.frobenius_map() * psi_coeff_x,
+                // y = frobenius(y)/(u+1)^((p-1)/2)
+                y: self.y.frobenius_map() * psi_coeff_y,
+                // z = frobenius(z)
+                z: self.z.frobenius_map(),
+            }
         }
     }
 
-    pub fn psi2(&self) -> G2Projective {
+    fn psi2(&self) -> G2Projective {
         // 1 / 2 ^ ((q-1)/3)
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0xcd03c9e48671f071,
@@ -1012,6 +1194,19 @@ impl G2Projective {
                 0x8eb60ebe01bacb9e,
                 0x03f97d6e83d050d2,
                 0x18f0206554638741,
+            ]),
+            c1: Fp::zero(),
+        };
+
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        let psi2_coeff_x = Fp2 {
+            c0: Fp::from_raw_unchecked([
+                0x8bfd_0000_0000_aaac,
+                0x4094_27eb_4f49_fffd,
+                0x897d_2965_0fb8_5f9b,
+                0xaa0d_857d_8975_9ad4,
+                0xec02_4086_63d4_de85,
+                0x1a01_11ea_397f_e699,
             ]),
             c1: Fp::zero(),
         };
@@ -1239,7 +1434,6 @@ impl Group for G2Projective {
         self.is_identity()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }

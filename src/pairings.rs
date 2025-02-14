@@ -49,7 +49,7 @@ impl MillerLoopResult {
         #[must_use]
         fn fp4_square(a: Fp2, b: Fp2) -> (Fp2, Fp2) {
             cfg_if::cfg_if! {
-                if #[cfg(target_os = "zkvm")] {
+                if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                     // c0 = b.square().mul_by_nonresidue() + a.square()
                     // c1 = (a + b).square() - a.square() - b.square()
                     let mut t0 = a;
@@ -101,7 +101,7 @@ impl MillerLoopResult {
 
             // For A
             cfg_if::cfg_if! {
-                if #[cfg(target_os = "zkvm")] {
+                if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                     z0 = -z0;
                     z0.add_inp(&t0);
                     z0.double_inp();
@@ -120,7 +120,7 @@ impl MillerLoopResult {
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(target_os = "zkvm")] {
+                if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                     let (t0, t1) = fp4_square(z2, z3);
                     let (t2, mut t3) = fp4_square(z4, z5);
                 } else {
@@ -131,7 +131,7 @@ impl MillerLoopResult {
 
             // For C
             cfg_if::cfg_if! {
-                if #[cfg(target_os = "zkvm")] {
+                if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                     z4 = -z4;
                     z4.add_inp(&t0);
                     z4.double_inp();
@@ -151,7 +151,7 @@ impl MillerLoopResult {
 
             // For B
             cfg_if::cfg_if! {
-                if #[cfg(target_os = "zkvm")] {
+                if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                     t3.mul_by_nonresidue_inp();
                     z2.add_inp(&t3);
                     z2.double_inp();
@@ -184,7 +184,7 @@ impl MillerLoopResult {
                 },
             }
         }
-        #[cfg(target_os = "zkvm")]
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
         fn cyclotomic_square_inp(f: &mut Fp12) {
             // z0: f.c0.c0
             // z1: f.c1.c1
@@ -237,7 +237,7 @@ impl MillerLoopResult {
             for i in (0..64).rev().map(|b| ((x >> b) & 1) == 1) {
                 if found_one {
                     cfg_if::cfg_if! {
-                        if #[cfg(target_os = "zkvm")] {
+                        if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                             cyclotomic_square_inp(&mut tmp);
                         } else {
                             tmp = cyclotomic_square(tmp);
@@ -249,7 +249,7 @@ impl MillerLoopResult {
 
                 if i {
                     cfg_if::cfg_if! {
-                        if #[cfg(target_os = "zkvm")] {
+                        if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                             tmp.mul_inp(f);
                         } else {
                             tmp *= f;
@@ -262,7 +262,7 @@ impl MillerLoopResult {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                 let mut t0 = self.0;
                 t0.frobenius_map_inp();
                 t0.frobenius_map_inp();
@@ -429,6 +429,25 @@ impl Gt {
     pub fn double(&self) -> Gt {
         Gt(self.0.square())
     }
+
+    /// RISCZero patch: raw data for external crate testing
+    #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+    pub fn all_raw(&self) -> [[u64; 6]; 12] {
+        [
+            self.0.c0.c0.c0.0,
+            self.0.c0.c0.c1.0,
+            self.0.c0.c1.c0.0,
+            self.0.c0.c1.c1.0,
+            self.0.c0.c2.c0.0,
+            self.0.c0.c2.c1.0,
+            self.0.c1.c0.c0.0,
+            self.0.c1.c0.c1.0,
+            self.0.c1.c1.c0.0,
+            self.0.c1.c1.c1.0,
+            self.0.c1.c2.c0.0,
+            self.0.c1.c2.c1.0,
+        ]
+    }
 }
 
 impl Neg for &Gt {
@@ -530,6 +549,7 @@ impl Group for Gt {
         Self::identity()
     }
 
+    #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
     fn generator() -> Self {
         // pairing(&G1Affine::generator(), &G2Affine::generator())
         Gt(Fp12 {
@@ -648,11 +668,129 @@ impl Group for Gt {
         })
     }
 
+    #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+    fn generator() -> Self {
+        Gt(Fp12 {
+            // each const * R_INV (mod p)
+            c0: Fp6 {
+                c0: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0xa843_05aa_ca17_89b6,
+                        0xb6d1_94f6_0839_c508,
+                        0x3dd8_e90c_e98d_b3e7,
+                        0x272d_441b_efa1_5c50,
+                        0xa7b2_d831_68d0_d727,
+                        0x1250_ebd8_71fc_0a92,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0x5988_2a98_eaa0_170f,
+                        0xf1a8_943e_5043_9f1d,
+                        0xaf5a_f689_452e_afab,
+                        0x68a8_4045_483c_92b7,
+                        0x8675_0ec6_a532_3488,
+                        0x089a_1c5b_46e5_110b,
+                    ]),
+                },
+                c1: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0x881c_4c84_9ec2_3e87,
+                        0xddff_5730_9396_b38c,
+                        0x16da_0e22_a503_1b54,
+                        0x0378_a68e_72a6_b3b2,
+                        0x9703_f239_689c_e34c,
+                        0x1368_bb44_5c7c_2d20,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0x3150_21ec_3c19_934f,
+                        0xffe5_1d7a_5799_73b1,
+                        0x7c90_d8bd_6606_5b1f,
+                        0x37e0_794e_1e65_a761,
+                        0xc273_fa07_5a50_5129,
+                        0x1935_02b8_6edb_8857,
+                    ]),
+                },
+                c2: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0x1dad_1c1f_b597_aaa5,
+                        0x19c3_4dff_bbaa_d843,
+                        0x1852_03fc_ca58_9ac7,
+                        0xfbf2_f8da_752f_7c74,
+                        0x9112_5ba8_4dc4_007c,
+                        0x01b2_f522_473d_1713,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0x8bea_e962_4045_b4b6,
+                        0x23f7_daca_a35c_8ca7,
+                        0x8061_e55c_ceba_478b,
+                        0x46da_634b_8f6b_e14a,
+                        0xbd3c_7993_7a45_b845,
+                        0x0181_0715_4f25_a764,
+                    ]),
+                },
+            },
+            c1: Fp6 {
+                c0: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0x0f94_8226_e47e_e89d,
+                        0xbb12_d583_86a8_703e,
+                        0xdea5_4d43_b2b7_3f2c,
+                        0xc887_84fb_b3d0_b2db,
+                        0x9cd6_bd15_c3d5_a04d,
+                        0x19f2_6337_d205_fb46,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0x102a_e1c2_d5d5_ab1a,
+                        0x1bfd_1b68_ff02_f0b8,
+                        0xa7d2_809d_61bf_e02e,
+                        0xd585_7baa_f222_eb95,
+                        0x9f80_940c_a771_b6ff,
+                        0x06fb_a23e_b7c5_af0d,
+                    ]),
+                },
+                c1: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0x1b93_b473_33e2_ba57,
+                        0x78ef_4888_1e32_fac9,
+                        0x7d0d_15ff_7b98_4e89,
+                        0xc81a_93b3_30ee_1a67,
+                        0xfcef_6808_3b0b_0ec5,
+                        0x11b8_b424_cd48_bf38,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0xbe22_91a0_c25a_99a2,
+                        0x7ba8_10c5_a09f_fdd9,
+                        0x20c8_06ad_3608_2910,
+                        0xc6a0_e978_6ab5_9733,
+                        0xc31b_4fcb_6ce5_771c,
+                        0x0335_0f55_a7ae_fcd3,
+                    ]),
+                },
+                c2: Fp2 {
+                    c0: Fp::from_raw_unchecked([
+                        0x9108_f024_2d0f_e3ef,
+                        0xa4fa_fc05_0662_45cb,
+                        0x1c7c_dba7_b387_2629,
+                        0xa189_e879_35a9_5405,
+                        0x0224_9b64_728f_fd21,
+                        0x04c5_8123_4d08_6a99,
+                    ]),
+                    c1: Fp::from_raw_unchecked([
+                        0xfde4_4938_3b67_6631,
+                        0xd48e_aa24_afe4_7e1e,
+                        0xdeff_686b_fd6d_f543,
+                        0x3bac_a4d7_2ca9_3544,
+                        0x0686_72cb_d01a_7ec7,
+                        0x0f41_e586_63bf_08cf,
+                    ]),
+                },
+            },
+        })
+    }
+
     fn is_identity(&self) -> Choice {
         self.ct_eq(&Self::identity())
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }
@@ -861,212 +999,220 @@ fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
     f
 }
 
-#[cfg(target_os = "zkvm")]
 fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
-    let mut c0 = coeffs.0;
-    let mut c1 = coeffs.1;
+    #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+    {
+        let mut c0 = coeffs.0;
+        let mut c1 = coeffs.1;
 
-    c0.c0.mul_inp(&p.y);
-    c0.c1.mul_inp(&p.y);
+        c0.c0 *= p.y;
+        c0.c1 *= p.y;
 
-    c1.c0.mul_inp(&p.x);
-    c1.c1.mul_inp(&p.x);
+        c1.c0 *= p.x;
+        c1.c1 *= p.x;
 
-    f.mul_by_014(&coeffs.2, &c1, &c0)
+        f.mul_by_014(&coeffs.2, &c1, &c0)
+    }
+
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    {
+        let mut c0 = coeffs.0;
+        let mut c1 = coeffs.1;
+
+        c0.c0.mul_inp(&p.y);
+        c0.c1.mul_inp(&p.y);
+
+        c1.c0.mul_inp(&p.x);
+        c1.c1.mul_inp(&p.x);
+
+        f.mul_by_014(&coeffs.2, &c1, &c0)
+    }
 }
 
-#[cfg(not(target_os = "zkvm"))]
-fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
-    let mut c0 = coeffs.0;
-    let mut c1 = coeffs.1;
-
-    c0.c0 *= p.y;
-    c0.c1 *= p.y;
-
-    c1.c0 *= p.x;
-    c1.c1 *= p.x;
-
-    f.mul_by_014(&coeffs.2, &c1, &c0)
-}
-
-#[cfg(target_os = "zkvm")]
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
-    let mut tmp0 = r.x;
-    tmp0.square_inp();
-    let mut tmp1 = r.y;
-    tmp1.square_inp();
-    let mut tmp2 = tmp1;
-    tmp2.square_inp();
-    let mut tmp3 = tmp1;
-    tmp3.add_inp(&r.x);
-    tmp3.square_inp();
-    tmp3.sub_inp(&tmp0);
-    tmp3.sub_inp(&tmp2);
-    tmp3.double_inp();
-    let mut tmp4 = tmp0;
-    tmp4.add_inp(&tmp0);
-    tmp4.add_inp(&tmp0);
-    let mut tmp6 = r.x;
-    tmp6.add_inp(&tmp4);
-    let mut tmp5 = tmp4;
-    tmp5.square_inp();
-    let mut zsquared = r.z;
-    zsquared.square_inp();
-    r.x = tmp5;
-    r.x.sub_inp(&tmp3);
-    r.x.sub_inp(&tmp3);
-    r.z.add_inp(&r.y);
-    r.z.square_inp();
-    r.z.sub_inp(&tmp1);
-    r.z.sub_inp(&zsquared);
-    r.y = tmp3;
-    r.y.sub_inp(&r.x);
-    r.y.mul_inp(&tmp4);
-    tmp2.double_inp();
-    tmp2.double_inp();
-    tmp2.double_inp();
-    r.y.sub_inp(&tmp2);
-    let mut tmp3 = tmp4;
-    tmp3.mul_inp(&zsquared);
-    tmp3.double_inp();
-    let tmp3 = -tmp3;
-    tmp6.square_inp();
-    tmp6.sub_inp(&tmp0);
-    tmp6.sub_inp(&tmp5);
-    tmp1.double_inp();
-    tmp1.double_inp();
-    tmp6.sub_inp(&tmp1);
-    let mut tmp0 = r.z;
-    tmp0.mul_inp(&zsquared);
-    tmp0.double_inp();
+    #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+    {
+        // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
+        let tmp0 = r.x.square();
+        let tmp1 = r.y.square();
+        let tmp2 = tmp1.square();
+        let tmp3 = (tmp1 + r.x).square() - tmp0 - tmp2;
+        let tmp3 = tmp3 + tmp3;
+        let tmp4 = tmp0 + tmp0 + tmp0;
+        let tmp6 = r.x + tmp4;
+        let tmp5 = tmp4.square();
+        let zsquared = r.z.square();
+        r.x = tmp5 - tmp3 - tmp3;
+        r.z = (r.z + r.y).square() - tmp1 - zsquared;
+        r.y = (tmp3 - r.x) * tmp4;
+        let tmp2 = tmp2 + tmp2;
+        let tmp2 = tmp2 + tmp2;
+        let tmp2 = tmp2 + tmp2;
+        r.y -= tmp2;
+        let tmp3 = tmp4 * zsquared;
+        let tmp3 = tmp3 + tmp3;
+        let tmp3 = -tmp3;
+        let tmp6 = tmp6.square() - tmp0 - tmp5;
+        let tmp1 = tmp1 + tmp1;
+        let tmp1 = tmp1 + tmp1;
+        let tmp6 = tmp6 - tmp1;
+        let tmp0 = r.z * zsquared;
+        let tmp0 = tmp0 + tmp0;
 
-    (tmp0, tmp3, tmp6)
+        (tmp0, tmp3, tmp6)
+    }
+
+    // SP1 patch
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    {
+        // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
+        let mut tmp0 = r.x;
+        tmp0.square_inp();
+        let mut tmp1 = r.y;
+        tmp1.square_inp();
+        let mut tmp2 = tmp1;
+        tmp2.square_inp();
+        let mut tmp3 = tmp1;
+        tmp3.add_inp(&r.x);
+        tmp3.square_inp();
+        tmp3.sub_inp(&tmp0);
+        tmp3.sub_inp(&tmp2);
+        tmp3.double_inp();
+        let mut tmp4 = tmp0;
+        tmp4.add_inp(&tmp0);
+        tmp4.add_inp(&tmp0);
+        let mut tmp6 = r.x;
+        tmp6.add_inp(&tmp4);
+        let mut tmp5 = tmp4;
+        tmp5.square_inp();
+        let mut zsquared = r.z;
+        zsquared.square_inp();
+        r.x = tmp5;
+        r.x.sub_inp(&tmp3);
+        r.x.sub_inp(&tmp3);
+        r.z.add_inp(&r.y);
+        r.z.square_inp();
+        r.z.sub_inp(&tmp1);
+        r.z.sub_inp(&zsquared);
+        r.y = tmp3;
+        r.y.sub_inp(&r.x);
+        r.y.mul_inp(&tmp4);
+        tmp2.double_inp();
+        tmp2.double_inp();
+        tmp2.double_inp();
+        r.y.sub_inp(&tmp2);
+        let mut tmp3 = tmp4;
+        tmp3.mul_inp(&zsquared);
+        tmp3.double_inp();
+        let tmp3 = -tmp3;
+        tmp6.square_inp();
+        tmp6.sub_inp(&tmp0);
+        tmp6.sub_inp(&tmp5);
+        tmp1.double_inp();
+        tmp1.double_inp();
+        tmp6.sub_inp(&tmp1);
+        let mut tmp0 = r.z;
+        tmp0.mul_inp(&zsquared);
+        tmp0.double_inp();
+
+        (tmp0, tmp3, tmp6)
+    }
 }
 
-#[cfg(not(target_os = "zkvm"))]
-fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
-    let tmp0 = r.x.square();
-    let tmp1 = r.y.square();
-    let tmp2 = tmp1.square();
-    let tmp3 = (tmp1 + r.x).square() - tmp0 - tmp2;
-    let tmp3 = tmp3 + tmp3;
-    let tmp4 = tmp0 + tmp0 + tmp0;
-    let tmp6 = r.x + tmp4;
-    let tmp5 = tmp4.square();
-    let zsquared = r.z.square();
-    r.x = tmp5 - tmp3 - tmp3;
-    r.z = (r.z + r.y).square() - tmp1 - zsquared;
-    r.y = (tmp3 - r.x) * tmp4;
-    let tmp2 = tmp2 + tmp2;
-    let tmp2 = tmp2 + tmp2;
-    let tmp2 = tmp2 + tmp2;
-    r.y -= tmp2;
-    let tmp3 = tmp4 * zsquared;
-    let tmp3 = tmp3 + tmp3;
-    let tmp3 = -tmp3;
-    let tmp6 = tmp6.square() - tmp0 - tmp5;
-    let tmp1 = tmp1 + tmp1;
-    let tmp1 = tmp1 + tmp1;
-    let tmp6 = tmp6 - tmp1;
-    let tmp0 = r.z * zsquared;
-    let tmp0 = tmp0 + tmp0;
-
-    (tmp0, tmp3, tmp6)
-}
-
-#[cfg(target_os = "zkvm")]
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
-    let mut zsquared = r.z;
-    zsquared.square_inp();
-    let mut ysquared = q.y;
-    ysquared.square_inp();
-    let mut t0 = q.y;
-    t0.add_inp(&r.z);
-    t0.square_inp();
-    t0.sub_inp(&ysquared);
-    t0.sub_inp(&zsquared);
-    t0.mul_inp(&zsquared);
-    let mut t1 = zsquared;
-    t1.mul_inp(&q.x);
-    t1.sub_inp(&r.x);
-    let mut t2 = t1;
-    t2.square_inp();
-    let mut t3 = t2;
-    t3.double_inp();
-    t3.double_inp();
-    let mut t4 = t3;
-    t4.mul_inp(&t1);
-    t0.sub_inp(&r.y);
-    t0.sub_inp(&r.y);
-    let mut t5 = t0;
-    t5.mul_inp(&q.x);
-    t3.mul_inp(&r.x);
-    r.x = t0;
-    r.x.square_inp();
-    r.x.sub_inp(&t4);
-    r.x.sub_inp(&t3);
-    r.x.sub_inp(&t3);
-    r.z.add_inp(&t1);
-    r.z.square_inp();
-    r.z.sub_inp(&zsquared);
-    r.z.sub_inp(&t2);
-    let mut t6 = q.y;
-    t6.add_inp(&r.z);
-    t3.sub_inp(&r.x);
-    t3.mul_inp(&t0);
-    t4.mul_inp(&r.y);
-    t4.double_inp();
-    r.y = t3;
-    r.y.sub_inp(&t4);
-    t6.square_inp();
-    t6.sub_inp(&ysquared);
-    let mut ztsquared = r.z;
-    ztsquared.square_inp();
-    t6.sub_inp(&ztsquared);
-    t5.double_inp();
-    t5.sub_inp(&t6);
-    let mut t6 = r.z;
-    t6.double_inp();
-    let mut t0 = -t0;
-    t0.double_inp();
+    #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+    {
+        // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
+        let zsquared = r.z.square();
+        let ysquared = q.y.square();
+        let t0 = zsquared * q.x;
+        let t1 = ((q.y + r.z).square() - ysquared - zsquared) * zsquared;
+        let t2 = t0 - r.x;
+        let t3 = t2.square();
+        let t4 = t3 + t3;
+        let t4 = t4 + t4;
+        let t5 = t4 * t2;
+        let t6 = t1 - r.y - r.y;
+        let t9 = t6 * q.x;
+        let t7 = t4 * r.x;
+        r.x = t6.square() - t5 - t7 - t7;
+        r.z = (r.z + t2).square() - zsquared - t3;
+        let t10 = q.y + r.z;
+        let t8 = (t7 - r.x) * t6;
+        let t0 = r.y * t5;
+        let t0 = t0 + t0;
+        r.y = t8 - t0;
+        let t10 = t10.square() - ysquared;
+        let ztsquared = r.z.square();
+        let t10 = t10 - ztsquared;
+        let t9 = t9 + t9 - t10;
+        let t10 = r.z + r.z;
+        let t6 = -t6;
+        let t1 = t6 + t6;
 
-    (t6, t0, t5)
-}
+        (t10, t1, t9)
+    }
 
-#[cfg(not(target_os = "zkvm"))]
-fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
-    let zsquared = r.z.square();
-    let ysquared = q.y.square();
-    let t0 = zsquared * q.x;
-    let t1 = ((q.y + r.z).square() - ysquared - zsquared) * zsquared;
-    let t2 = t0 - r.x;
-    let t3 = t2.square();
-    let t4 = t3 + t3;
-    let t4 = t4 + t4;
-    let t5 = t4 * t2;
-    let t6 = t1 - r.y - r.y;
-    let t9 = t6 * q.x;
-    let t7 = t4 * r.x;
-    r.x = t6.square() - t5 - t7 - t7;
-    r.z = (r.z + t2).square() - zsquared - t3;
-    let t10 = q.y + r.z;
-    let t8 = (t7 - r.x) * t6;
-    let t0 = r.y * t5;
-    let t0 = t0 + t0;
-    r.y = t8 - t0;
-    let t10 = t10.square() - ysquared;
-    let ztsquared = r.z.square();
-    let t10 = t10 - ztsquared;
-    let t9 = t9 + t9 - t10;
-    let t10 = r.z + r.z;
-    let t6 = -t6;
-    let t1 = t6 + t6;
+    // SP1 patch
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    {
+        // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
+        let mut zsquared = r.z;
+        zsquared.square_inp();
+        let mut ysquared = q.y;
+        ysquared.square_inp();
+        let mut t0 = q.y;
+        t0.add_inp(&r.z);
+        t0.square_inp();
+        t0.sub_inp(&ysquared);
+        t0.sub_inp(&zsquared);
+        t0.mul_inp(&zsquared);
+        let mut t1 = zsquared;
+        t1.mul_inp(&q.x);
+        t1.sub_inp(&r.x);
+        let mut t2 = t1;
+        t2.square_inp();
+        let mut t3 = t2;
+        t3.double_inp();
+        t3.double_inp();
+        let mut t4 = t3;
+        t4.mul_inp(&t1);
+        t0.sub_inp(&r.y);
+        t0.sub_inp(&r.y);
+        let mut t5 = t0;
+        t5.mul_inp(&q.x);
+        t3.mul_inp(&r.x);
+        r.x = t0;
+        r.x.square_inp();
+        r.x.sub_inp(&t4);
+        r.x.sub_inp(&t3);
+        r.x.sub_inp(&t3);
+        r.z.add_inp(&t1);
+        r.z.square_inp();
+        r.z.sub_inp(&zsquared);
+        r.z.sub_inp(&t2);
+        let mut t6 = q.y;
+        t6.add_inp(&r.z);
+        t3.sub_inp(&r.x);
+        t3.mul_inp(&t0);
+        t4.mul_inp(&r.y);
+        t4.double_inp();
+        r.y = t3;
+        r.y.sub_inp(&t4);
+        t6.square_inp();
+        t6.sub_inp(&ysquared);
+        let mut ztsquared = r.z;
+        ztsquared.square_inp();
+        t6.sub_inp(&ztsquared);
+        t5.double_inp();
+        t5.sub_inp(&t6);
+        let mut t6 = r.z;
+        t6.double_inp();
+        let mut t0 = -t0;
+        t0.double_inp();
 
-    (t10, t1, t9)
+        (t6, t0, t5)
+    }
 }
 
 impl PairingCurveAffine for G1Affine {
