@@ -111,7 +111,7 @@ impl Fp6 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn add_inp(&mut self, rhs: &Fp6) {
         self.c0.add_inp(&rhs.c0);
         self.c1.add_inp(&rhs.c1);
@@ -119,7 +119,7 @@ impl Fp6 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn sub_inp(&mut self, rhs: &Fp6) {
         self.c0.sub_inp(&rhs.c0);
         self.c1.sub_inp(&rhs.c1);
@@ -166,7 +166,7 @@ impl Fp6 {
     }
 
     /// Multiply by quadratic nonresidue v.
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn mul_by_nonresidue_owned(self) -> Self {
         // Given a + bv + cv^2, this produces
         //     av + bv^2 + cv^3
@@ -263,7 +263,7 @@ impl Fp6 {
 
     /// Raises this element to p.
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn frobenius_map_inp(&mut self) {
         self.c0.frobenius_map_inp();
         self.c1.frobenius_map_inp();
@@ -415,8 +415,8 @@ impl Fp6 {
                         &b10_p_b11,
                     ),
                     c1: Fp::sum_of_six_products(
-                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c0.c1, &b.c0.c0,
-                        &b20_p_b21, &b20_m_b21, &b10_p_b11, &b10_m_b11,
+                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c0.c1,
+                        &b.c0.c0, &b20_p_b21, &b20_m_b21, &b10_p_b11, &b10_m_b11,
                     ),
                 },
                 c1: Fp2 {
@@ -435,8 +435,8 @@ impl Fp6 {
                         &b20_p_b21,
                     ),
                     c1: Fp::sum_of_six_products(
-                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c1.c1, &b.c1.c0,
-                        &b.c0.c1, &b.c0.c0, &b20_p_b21, &b20_m_b21,
+                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c1.c1,
+                        &b.c1.c0, &b.c0.c1, &b.c0.c0, &b20_p_b21, &b20_m_b21,
                     ),
                 },
                 c2: Fp2 {
@@ -455,8 +455,8 @@ impl Fp6 {
                         &b.c0.c1,
                     ),
                     c1: Fp::sum_of_six_products(
-                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c2.c1, &b.c2.c0,
-                        &b.c1.c1, &b.c1.c0, &b.c0.c1, &b.c0.c0,
+                        &a.c0.c0, &a.c0.c1, &a.c1.c0, &a.c1.c1, &a.c2.c0, &a.c2.c1, &b.c2.c1,
+                        &b.c2.c0, &b.c1.c1, &b.c1.c0, &b.c0.c1, &b.c0.c0,
                     ),
                 },
             }

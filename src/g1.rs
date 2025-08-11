@@ -216,7 +216,6 @@ impl G1Affine {
 
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
-    #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
     pub fn generator() -> G1Affine {
         #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         return G1Affine {
@@ -373,7 +372,7 @@ impl G1Affine {
         // We already know the point is on the curve because this is established
         // by the y-coordinate recovery procedure in from_compressed_unchecked().
 
-        Self::from_compressed_unchecked(bytes).and_then(|p| CtOption::new(p, p.is_torsion_free()))
+        Self::from_compressed_unchecked(bytes).and_then(|p| { CtOption::new(p, p.is_torsion_free()) })
     }
 
     /// Attempts to deserialize an uncompressed element, not checking if the
@@ -1248,7 +1247,6 @@ impl Group for G1Projective {
         self.is_identity()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }

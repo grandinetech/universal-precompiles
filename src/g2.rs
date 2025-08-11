@@ -810,7 +810,7 @@ impl G2Projective {
                 ]),
             },
             z: Fp2::one(),
-        }
+        };
 
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         return G2Projective {
@@ -967,7 +967,7 @@ impl G2Projective {
                 x: x3,
                 y: y3,
                 z: z3,
-            }   
+            }
         }
 
         // SP1 patch
@@ -1434,7 +1434,6 @@ impl Group for G2Projective {
         self.is_identity()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }

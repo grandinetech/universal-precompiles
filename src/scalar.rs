@@ -19,10 +19,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 #[cfg(feature = "bits")]
 use ff::{FieldBits, PrimeFieldBits};
 
-use crate::util::{adc, sbb};
-
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
-use crate::util::mac;
+use crate::util::{adc, sbb, mac};
 
 #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
 use risc0_bigint2::field;
@@ -58,7 +55,7 @@ impl From<u64> for Scalar {
         return Scalar([val, 0, 0, 0]) * R2;
 
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
-        return Scalar([val, 0, 0, 0]); 
+        return Scalar([val, 0, 0, 0]);
     }
 }
 
@@ -99,7 +96,10 @@ const MODULUS: Scalar = Scalar([
 ]);
 
 /// The modulus as u32 limbs.
-#[cfg(any(all(feature = "bits", not(target_pointer_width = "64"))), all(target_os = "zkvm", target_vendor = "succinct"))]
+#[cfg(any(
+    all(feature = "bits", not(target_pointer_width = "64")),
+    all(target_os = "zkvm", target_vendor = "succinct")
+))]
 const MODULUS_LIMBS_32: [u32; 8] = [
     0x0000_0001,
     0xffff_ffff,
@@ -192,7 +192,6 @@ impl_binops_additive!(Scalar, Scalar);
 impl_binops_multiplicative!(Scalar, Scalar);
 
 /// INV = -(q^{-1} mod 2^64) mod 2^64
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
 const INV: u64 = 0xffff_fffe_ffff_ffff;
 
 /// R = 2^256 mod q
@@ -321,7 +320,7 @@ impl Scalar {
         #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         return R;
 
-        /// RISCZero patch: Non-Montgomery.
+        // RISCZero patch: Non-Montgomery.
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         return Scalar([1, 0, 0, 0]);
     }
@@ -425,7 +424,7 @@ impl Scalar {
 
     /// Converts from an integer represented in little endian
     /// into its (congruent) `Scalar` representation.
-    pub const fn from_raw(val: [u64; 4]) -> Self {
+    pub fn from_raw(val: [u64; 4]) -> Self {
         #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         return (&Scalar(val)).mul(&R2);
 
@@ -434,7 +433,6 @@ impl Scalar {
     }
 
     /// Squares this element.
-    #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
     #[inline]
     /// CPU version of the square operation. Necessary to prevent syscalls in unconstrained mode.
     fn cpu_square(&self) -> Scalar {
@@ -630,7 +628,7 @@ impl Scalar {
 
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         {
-            /// RISCZero patch: non-Montgomery mult
+            // RISCZero patch: non-Montgomery mult
             if self.is_zero().into() {
                 return CtOption::new(Scalar::zero(), Choice::from(0u8));
             }
@@ -824,7 +822,7 @@ impl Scalar {
 
     /// Adds `rhs` to `self`, returning the result.
     #[inline]
-    pub const fn add(&self, rhs: &Self) -> Self {
+    pub fn add(&self, rhs: &Self) -> Self {
         #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         {
             let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
@@ -839,7 +837,7 @@ impl Scalar {
             (&Scalar([d0, d1, d2, d3])).sub(&MODULUS)
         }
 
-        /// RISCZero patch
+        // RISCZero patch
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         {
             let mut result = [0u32; 8];
@@ -922,12 +920,10 @@ impl Field for Scalar {
         Self::from_bytes_wide(&buf)
     }
 
-    #[must_use]
     fn square(&self) -> Self {
         self.square()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }

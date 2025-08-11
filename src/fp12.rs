@@ -114,34 +114,36 @@ impl Fp12 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm")]
     pub fn mul_by_014(&self, c0: &Fp2, c1: &Fp2, c4: &Fp2) -> Fp12 {
-        let aa = self.c0.mul_by_01(c0, c1);
-        let bb = self.c1.mul_by_1(c4);
-        let o = c1 + c4;
-        let c1 = self.c1 + self.c0;
-        let mut c1 = c1.mul_by_01(c0, &o);
-        c1.sub_inp(&aa);
-        c1.sub_inp(&bb);
-        let mut c0 = bb.mul_by_nonresidue();
-        c0.add_inp(&aa);
+        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        {
+            let aa = self.c0.mul_by_01(c0, c1);
+            let bb = self.c1.mul_by_1(c4);
+            let o = c1 + c4;
+            let c1 = self.c1 + self.c0;
+            let c1 = c1.mul_by_01(c0, &o);
+            let c1 = c1 - aa - bb;
+            let c0 = bb;
+            let c0 = c0.mul_by_nonresidue();
+            let c0 = c0 + aa;
 
-        Fp12 { c0, c1 }
-    }
+            Fp12 { c0, c1 }
+        }
 
-    #[cfg(not(target_os = "zkvm"))]
-    pub fn mul_by_014(&self, c0: &Fp2, c1: &Fp2, c4: &Fp2) -> Fp12 {
-        let aa = self.c0.mul_by_01(c0, c1);
-        let bb = self.c1.mul_by_1(c4);
-        let o = c1 + c4;
-        let c1 = self.c1 + self.c0;
-        let c1 = c1.mul_by_01(c0, &o);
-        let c1 = c1 - aa - bb;
-        let c0 = bb;
-        let c0 = c0.mul_by_nonresidue();
-        let c0 = c0 + aa;
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            let aa = self.c0.mul_by_01(c0, c1);
+            let bb = self.c1.mul_by_1(c4);
+            let o = c1 + c4;
+            let c1 = self.c1 + self.c0;
+            let mut c1 = c1.mul_by_01(c0, &o);
+            c1.sub_inp(&aa);
+            c1.sub_inp(&bb);
+            let mut c0 = bb.mul_by_nonresidue();
+            c0.add_inp(&aa);
 
-        Fp12 { c0, c1 }
+            Fp12 { c0, c1 }
+        }
     }
 
     #[inline(always)]
@@ -163,7 +165,7 @@ impl Fp12 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn mul_inp(&mut self, other: &Fp12) {
         let aa = self.c0 * other.c0;
         let bb = self.c1 * other.c1;
@@ -180,7 +182,7 @@ impl Fp12 {
     #[inline]
     fn mul(&self, other: &Fp12) -> Self {
         cfg_if::cfg_if! {
-            if #[cfg(target_os = "zkvm")] {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
                 let mut out = self.clone();
                 out.mul_inp(other);
                 out
@@ -201,14 +203,16 @@ impl Fp12 {
     }
 
     /// Raises this element to p.
-
-    #[cfg_attr(not(all(target_os = "zkvm", target_arch = "riscv32")), inline(always))]
+    #[cfg_attr(
+        any(not(target_os = "zkvm"), target_vendor = "succinct"),
+        inline(always)
+    )]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
         let c1 = self.c1.frobenius_map();
 
         // c1 = c1 * (u + 1)^((p - 1) / 6)
-        #[cfg(not(all(target_os = "zkvm", target_arch = "riscv32")))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
         let c1 = c1
             * Fp6::from(Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -229,7 +233,7 @@ impl Fp12 {
                 ]),
             });
 
-        #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         let c1 = c1
             * Fp6::from(Fp2 {
                 // each const * R_INV (mod p)
@@ -256,7 +260,7 @@ impl Fp12 {
 
     /// Raises this element to p.
     #[inline]
-    #[cfg(target_os = "zkvm")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn frobenius_map_inp(&mut self) {
         self.c0.frobenius_map_inp();
         self.c1.frobenius_map_inp();
@@ -289,33 +293,34 @@ impl Fp12 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm")]
     pub fn square(&self) -> Self {
-        let ab = self.c0 * self.c1;
-        let mut c0c1 = self.c0;
-        c0c1.add_inp(&self.c1);
-        let mut c0 = self.c1.mul_by_nonresidue();
-        c0.add_inp(&self.c0);
-        c0 = c0 * c0c1;
-        c0.sub_inp(&ab);
-        c0.sub_inp(&ab.mul_by_nonresidue());
+        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        {
+            let ab = self.c0 * self.c1;
+            let c0c1 = self.c0 + self.c1;
+            let c0 = self.c1.mul_by_nonresidue();
+            let c0 = c0 + self.c0;
+            let c0 = c0 * c0c1;
+            let c0 = c0 - ab;
+            let c1 = ab + ab;
+            let c0 = c0 - ab.mul_by_nonresidue();
 
-        Fp12 { c0, c1: ab + ab }
-    }
+            Fp12 { c0, c1 }
+        }
 
-    #[inline]
-    #[cfg(not(target_os = "zkvm"))]
-    pub fn square(&self) -> Self {
-        let ab = self.c0 * self.c1;
-        let c0c1 = self.c0 + self.c1;
-        let c0 = self.c1.mul_by_nonresidue();
-        let c0 = c0 + self.c0;
-        let c0 = c0 * c0c1;
-        let c0 = c0 - ab;
-        let c1 = ab + ab;
-        let c0 = c0 - ab.mul_by_nonresidue();
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            let ab = self.c0 * self.c1;
+            let mut c0c1 = self.c0;
+            c0c1.add_inp(&self.c1);
+            let mut c0 = self.c1.mul_by_nonresidue();
+            c0.add_inp(&self.c0);
+            c0 = c0 * c0c1;
+            c0.sub_inp(&ab);
+            c0.sub_inp(&ab.mul_by_nonresidue());
 
-        Fp12 { c0, c1 }
+            Fp12 { c0, c1: ab + ab }
+        }
     }
 
     #[inline]

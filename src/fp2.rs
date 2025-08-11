@@ -28,8 +28,11 @@ use crate::fp::MODULUS_SQR;
 use risc0_bigint2::field;
 
 #[derive(Copy, Clone)]
-#[cfg_attr(all(target_os = "zkvm", not(target_vendor = "succinct")), derive(bytemuck::Pod, bytemuck::Zeroable))]
-#[cfg_attr(target_os = "zkvm"), repr(C)] // NOTE: this is technically required for ensuring the memory layout used in the zkvm precompiles is valid
+#[cfg_attr(
+    all(target_os = "zkvm", not(target_vendor = "succinct")),
+    derive(bytemuck::Pod, bytemuck::Zeroable)
+)]
+#[cfg_attr(target_os = "zkvm", repr(C))] // NOTE: this is technically required for ensuring the memory layout used in the zkvm precompiles is valid
 pub struct Fp2 {
     pub c0: Fp,
     pub c1: Fp,
@@ -195,7 +198,7 @@ impl Fp2 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn mul_by_nonresidue_inp(&mut self) {
         // Multiply a + bu by u + 1, getting
         // au + a + bu^2 + bu
@@ -263,14 +266,14 @@ impl Fp2 {
     /// the internal Montgomery form to a plain BigInt form.
     /// Used as a bridge between the internal Montgomery representation and the zkvm precompiles.
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub(crate) fn mul_r_inv_internal(&mut self) {
         self.c0.mul_r_inv_internal();
         self.c1.mul_r_inv_internal();
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn square_inp(&mut self) {
         unsafe {
             syscall_bls12381_fp2_mulmod(
@@ -330,7 +333,10 @@ impl Fp2 {
         {
             let mut out = self.clone();
             unsafe {
-                syscall_bls12381_fp2_mulmod(out.c0.0.as_mut_ptr() as *mut u32, self.c0.0.as_ptr() as *const u32);
+                syscall_bls12381_fp2_mulmod(
+                    out.c0.0.as_mut_ptr() as *mut u32,
+                    self.c0.0.as_ptr() as *const u32,
+                );
             }
             out.mul_r_inv_internal();
             out
@@ -338,7 +344,7 @@ impl Fp2 {
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn mul_inp(&mut self, rhs: &Fp2) {
         unsafe {
             syscall_bls12381_fp2_mulmod(
@@ -394,7 +400,10 @@ impl Fp2 {
         {
             let mut out = self.clone();
             unsafe {
-                syscall_bls12381_fp2_mulmod(out.c0.0.as_mut_ptr() as *mut u32, rhs.c0.0.as_ptr() as *const u32);
+                syscall_bls12381_fp2_mulmod(
+                    out.c0.0.as_mut_ptr() as *mut u32,
+                    rhs.c0.0.as_ptr() as *const u32,
+                );
             }
             out.mul_r_inv_internal();
             out
@@ -457,14 +466,17 @@ impl Fp2 {
         {
             let mut out = self.clone();
             unsafe {
-                syscall_bls12381_fp2_addmod(out.c0.0.as_mut_ptr() as *mut u32, rhs.c0.0.as_ptr() as *const u32);
+                syscall_bls12381_fp2_addmod(
+                    out.c0.0.as_mut_ptr() as *mut u32,
+                    rhs.c0.0.as_ptr() as *const u32,
+                );
             }
             out
         }
     }
 
     #[inline]
-    #[cfg(target_os = "zkvm", target_vendor = "succinct")]
+    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
     pub fn sub_inp(&mut self, rhs: &Fp2) {
         unsafe {
             syscall_bls12381_fp2_submod(
@@ -507,7 +519,10 @@ impl Fp2 {
         {
             let mut out = self.clone();
             unsafe {
-                syscall_bls12381_fp2_submod(out.c0.0.as_mut_ptr() as *mut u32, rhs.c0.0.as_ptr() as *const u32);
+                syscall_bls12381_fp2_submod(
+                    out.c0.0.as_mut_ptr() as *mut u32,
+                    rhs.c0.0.as_ptr() as *const u32,
+                );
             }
             out
         }
@@ -528,7 +543,7 @@ impl Fp2 {
         // RISC0
         // It is actually original zkcrypto implementation, but it differs with
         // cpu_neg implementation, as `cpu_neg` uses `cpu_neg` of Fp, which is
-        // not accelerated with precompiles. Hence, we copy original 
+        // not accelerated with precompiles. Hence, we copy original
         // implementation.
         #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
         return Fp2 {
@@ -541,7 +556,10 @@ impl Fp2 {
         {
             let mut out = Fp2::zero();
             unsafe {
-                syscall_bls12381_fp2_submod(out.c0.0.as_mut_ptr() as *mut u32, self.c0.0.as_ptr() as *const u32);
+                syscall_bls12381_fp2_submod(
+                    out.c0.0.as_mut_ptr() as *mut u32,
+                    self.c0.0.as_ptr() as *const u32,
+                );
             }
             out
         }
@@ -804,7 +822,6 @@ impl Fp2 {
             let inv = Fp2::from_bytes(bytes).unwrap();
 
             CtOption::new(inv, (self * inv).ct_eq(&Fp2::one()))
-
         }
     }
 
