@@ -115,7 +115,7 @@ impl Fp12 {
 
     #[inline]
     pub fn mul_by_014(&self, c0: &Fp2, c1: &Fp2, c4: &Fp2) -> Fp12 {
-        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
         {
             let aa = self.c0.mul_by_01(c0, c1);
             let bb = self.c1.mul_by_1(c4);
@@ -130,7 +130,7 @@ impl Fp12 {
             Fp12 { c0, c1 }
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
         {
             let aa = self.c0.mul_by_01(c0, c1);
             let bb = self.c1.mul_by_1(c4);
@@ -165,7 +165,7 @@ impl Fp12 {
     }
 
     #[inline]
-    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
     pub fn mul_inp(&mut self, other: &Fp12) {
         let aa = self.c0 * other.c0;
         let bb = self.c1 * other.c1;
@@ -182,7 +182,7 @@ impl Fp12 {
     #[inline]
     fn mul(&self, other: &Fp12) -> Self {
         cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
                 let mut out = self.clone();
                 out.mul_inp(other);
                 out
@@ -204,7 +204,7 @@ impl Fp12 {
 
     /// Raises this element to p.
     #[cfg_attr(
-        any(not(target_os = "zkvm"), target_vendor = "succinct"),
+        any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"),
         inline(always)
     )]
     pub fn frobenius_map(&self) -> Self {
@@ -212,7 +212,7 @@ impl Fp12 {
         let c1 = self.c1.frobenius_map();
 
         // c1 = c1 * (u + 1)^((p - 1) / 6)
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
         let c1 = c1
             * Fp6::from(Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -233,7 +233,7 @@ impl Fp12 {
                 ]),
             });
 
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         let c1 = c1
             * Fp6::from(Fp2 {
                 // each const * R_INV (mod p)
@@ -260,7 +260,7 @@ impl Fp12 {
 
     /// Raises this element to p.
     #[inline]
-    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
     pub fn frobenius_map_inp(&mut self) {
         self.c0.frobenius_map_inp();
         self.c1.frobenius_map_inp();
@@ -294,7 +294,7 @@ impl Fp12 {
 
     #[inline]
     pub fn square(&self) -> Self {
-        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
         {
             let ab = self.c0 * self.c1;
             let c0c1 = self.c0 + self.c1;
@@ -308,7 +308,7 @@ impl Fp12 {
             Fp12 { c0, c1 }
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
         {
             let ab = self.c0 * self.c1;
             let mut c0c1 = self.c0;

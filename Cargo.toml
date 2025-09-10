@@ -34,6 +34,9 @@ risc0-bigint2 = { version = "1.4.0-rc.2", default-features = false, features = [
 [target.'cfg(all(target_os = "zkvm", target_vendor = "succinct"))'.dependencies]
 sp1-lib = { version = "5.0.0", default-features = false }
 
+[target.'cfg(all(target_os = "zkvm", target_vendor = "zkm"))'.dependencies]
+zkm-lib = { git = "https://github.com/ProjectZKM/Ziren.git", default-features = false }
+
 [dev-dependencies]
 csv = ">= 1.0, < 1.2" # csv 1.2 has MSRV 1.60
 criterion = "0.3"

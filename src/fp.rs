@@ -17,7 +17,16 @@ use {
     sp1_lib::{syscall_bls12381_fp_addmod, syscall_bls12381_fp_mulmod, syscall_bls12381_fp_submod},
 };
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+use {
+    zkm_lib::{
+        io::{hint_slice, read_vec},
+        unconstrained,
+    },
+    zkm_lib::{syscall_bls12381_fp_addmod, syscall_bls12381_fp_mulmod, syscall_bls12381_fp_submod},
+};
+
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 use risc0_bigint2::field;
 
 // The internal representation of this type is six 64-bit unsigned
@@ -25,11 +34,11 @@ use risc0_bigint2::field;
 // Montgomery form; i.e., Scalar(a) = aR mod p, with R = 2^384.
 #[derive(Copy, Clone)]
 #[cfg_attr(
-    all(target_os = "zkvm", not(target_vendor = "succinct")),
+    all(target_os = "zkvm", not(any(target_vendor = "succinct", target_vendor = "zkm"))),
     derive(bytemuck::Pod, bytemuck::Zeroable)
 )] // RISC0 modifications
-#[cfg_attr(all(target_os = "zkvm", not(target_vendor = "succinct")), repr(C))]
-#[cfg_attr(all(target_os = "zkvm", target_vendor = "succinct"), repr(transparent))] // NOTE: this is technically required for ensuring the memory layout used in the zkvm precompiles is valid (SP1)
+#[cfg_attr(all(target_os = "zkvm", not(any(target_vendor = "succinct", target_vendor = "zkm"))), repr(C))]
+#[cfg_attr(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")), repr(transparent))] // NOTE: this is technically required for ensuring the memory layout used in the zkvm precompiles is valid (SP1 & ZKM)
 pub struct Fp(pub(crate) [u64; 6]);
 
 impl fmt::Debug for Fp {
@@ -94,7 +103,7 @@ pub const MODULUS: [u64; 6] = [
     0x1a01_11ea_397f_e69a,
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 pub const MODULUS_SQR: [u64; 12] = [
     0x26aa_0000_1c71_8e39,
     0x7ced_6b1d_7638_2eab,
@@ -115,6 +124,17 @@ const INV: u64 = 0x89f3_fffc_fffc_fffd;
 
 /// R_INV = (2^384)^(-1) mod p
 #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+const R_INV: Fp = Fp([
+    0xf4d38259380b4820,
+    0x7fe11274d898fafb,
+    0x343ea97914956dc8,
+    0x1797ab1458a88de9,
+    0xed5e64273c4f538b,
+    0x14fec701e8fb0ce9,
+]);
+
+/// R_INV = (2^384)^(-1) mod p
+#[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
 const R_INV: Fp = Fp([
     0xf4d38259380b4820,
     0x7fe11274d898fafb,
@@ -145,7 +165,7 @@ const R2: Fp = Fp([
 ]);
 
 /// R3 = 2^(384*3) mod p
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
 const R3: Fp = Fp([
     0xed48_ac6b_d94c_a1e0,
     0x315f_831e_03a7_adf8,
@@ -214,13 +234,13 @@ impl Fp {
     #[inline]
     pub const fn one() -> Fp {
         // Standard zkcrypto implementation
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
         {
             R
         }
 
         // RISCZero patch: non-Montgomery
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             Fp([1, 0, 0, 0, 0, 0])
         }
@@ -255,7 +275,7 @@ impl Fp {
         // of 0xffff...ffff. Otherwise, it'll be zero.
         let is_some = (borrow as u8) & 1;
 
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
         {
             // Convert to Montgomery form by computing
             // (a.R^0 * R^2) / R = a.R
@@ -270,13 +290,13 @@ impl Fp {
     pub fn to_bytes(&self) -> [u8; 48] {
         // Turn into canonical form by computing
         // (a.R) / R = a
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
 
         // Skip for Risc0
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         let tmp = self;
 
         let mut res = [0; 48];
@@ -330,11 +350,11 @@ impl Fp {
         let d0 = Fp([limbs[5], limbs[4], limbs[3], limbs[2], limbs[1], limbs[0]]);
 
         // Convert to Montgomery form
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
         return d0 * R2 + d1 * R3;
 
         // no need for risc0
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))] //TODO: untested
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))] //TODO: untested
         return d0 * R + d1 * R2;
     }
 
@@ -347,12 +367,12 @@ impl Fp {
         // (p - 1) // 2.
 
         // First, because self is in Montgomery form we need to reduce it
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
 
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         let tmp = self;
 
         let (_, borrow) = sbb(tmp.0[0], 0xdcff_7fff_ffff_d556, 0);
@@ -436,7 +456,7 @@ impl Fp {
         return self.cpu_sqrt();
 
         // RISCZero version, without `cpu_` prefixed methods
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             let sqrt = self.pow_vartime(&[
                 0xee7f_bfff_ffff_eaab,
@@ -491,6 +511,48 @@ impl Fp {
                 }
             }
         }
+
+        // Ziren patched version
+        #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+        {
+            if self.is_zero().into() {
+                return CtOption::new(Self::zero(), Choice::from(1u8));
+            }
+
+            let nqr = Self::from_bytes(&{
+                let mut buf = [0; 48];
+                buf[47] = 2;
+                buf
+            })
+            .unwrap();
+
+            // Use a hook to see if we can decompress with the syscall.
+            zkm_lib::unconstrained! {
+                zkm_lib::io::write(zkm_lib::io::FD_BLS12_381_SQRT, &self.to_bytes());
+            }
+
+            // The first byte is the status of the sqrt syscall.
+            let status = read_vec()[0];
+            // Assert the hook only writes back 48 bytes.
+            let byte_vec = read_vec().try_into().unwrap();
+
+            match status {
+                0 => {
+                    let root = Fp::from_bytes(&byte_vec).unwrap();
+
+                    assert!(root * root == *self * nqr);
+
+                    CtOption::new(Fp::zero(), Choice::from(0u8))
+                }
+                _ => {
+                    let root = Fp::from_bytes(&byte_vec).unwrap();
+
+                    assert!(root * root == *self);
+
+                    CtOption::new(root, Choice::from(1u8))
+                }
+            }
+        }
     }
 
     #[inline]
@@ -519,7 +581,7 @@ impl Fp {
         return self.cpu_invert();
 
         // Risc0 patched version
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             if self.is_zero().into() {
                 return CtOption::new(Fp::zero(), Choice::from(0u8));
@@ -541,6 +603,26 @@ impl Fp {
 
             unconstrained! {
                 sp1_lib::io::write(sp1_lib::io::FD_BLS12_381_INVERSE, &self.to_bytes());
+            }
+
+            let byte_vec = read_vec().try_into().unwrap();
+
+            let inv = Fp::from_bytes(&byte_vec).unwrap();
+
+            assert!(self * &inv == Fp::one(), "Invalid hint: Fp invert");
+
+            CtOption::new(inv, (self * inv).ct_eq(&Fp::one()))
+        }
+
+        // Ziren patched version
+        #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+        {
+            if self.is_zero().into() {
+                return CtOption::new(Self::zero(), Choice::from(0u8));
+            }
+
+            unconstrained! {
+                zkm_lib::io::write(zkm_lib::io::FD_BLS12_381_INVERSE, &self.to_bytes());
             }
 
             let byte_vec = read_vec().try_into().unwrap();
@@ -586,6 +668,17 @@ impl Fp {
     }
 
     #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+    pub fn add_inp(&mut self, rhs: &Fp) {
+        unsafe {
+            syscall_bls12381_fp_addmod(
+                self.0.as_mut_ptr() as *mut u32,
+                rhs.0.as_ptr() as *const u32,
+            );
+        }
+    }
+
+    #[inline]
     /// CPU version of the addition operation. Necessary to prevent syscalls in unconstrained mode.
     pub(crate) fn cpu_add(&self, rhs: &Fp) -> Fp {
         let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
@@ -602,10 +695,10 @@ impl Fp {
 
     #[inline]
     pub fn add(&self, rhs: &Fp) -> Fp {
-        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        #[cfg(any(not(target_os = "zkvm"), not(any(target_vendor = "succinct", target_vendor = "zkm"))))]
         return self.cpu_add(&rhs);
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
         {
             let mut out = self.clone();
             unsafe {
@@ -618,7 +711,7 @@ impl Fp {
         }
     }
 
-    #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+    #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
     #[inline]
     pub fn add_zkvm(&self, rhs: &Fp) -> Fp {
         let mut result = [0u32; 12];
@@ -658,11 +751,11 @@ impl Fp {
     #[inline]
     pub fn neg(&self) -> Fp {
         // Original zkcrypto implementation.
-        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        #[cfg(any(not(target_os = "zkvm"), not(any(target_vendor = "succinct", target_vendor = "zkm"))))]
         return self.cpu_neg();
 
         // Patched SP1 version
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
         {
             let mut out = Fp::zero();
             unsafe {
@@ -687,6 +780,17 @@ impl Fp {
     }
 
     #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+    pub fn sub_inp(&mut self, rhs: &Fp) {
+        unsafe {
+            syscall_bls12381_fp_submod(
+                self.0.as_mut_ptr() as *mut u32,
+                rhs.0.as_ptr() as *const u32,
+            );
+        }
+    }
+
+    #[inline]
     pub fn sub(&self, rhs: &Fp) -> Fp {
         // Original zkcrypto implementation
         #[cfg(not(target_os = "zkvm"))]
@@ -695,7 +799,7 @@ impl Fp {
         }
 
         // Risc0 patched version
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             let mut result = [0u32; 12];
             let lhs: &[u32; 12] = bytemuck::cast_ref(&self.0);
@@ -706,7 +810,7 @@ impl Fp {
             Fp(ret)
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
         {
             let mut out = self.clone();
             unsafe {
@@ -729,7 +833,7 @@ impl Fp {
     ///
     /// Uses precompiles to calculate it naively but much more cheaply.
     #[inline]
-    #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
     pub(crate) fn sum_of_products<const T: usize>(mut a: [Fp; T], b: [Fp; T]) -> Fp {
         let mut out = Fp::zero();
         for (ai, bi) in a.iter_mut().zip(b.iter()) {
@@ -801,7 +905,7 @@ impl Fp {
     }
 
     /// RISCZero patch (sum_of_two_products already replaced by deg2 patch)
-    #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+    #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
     #[inline]
     pub(crate) fn sum_of_six_products(
         a0: &Fp,
@@ -916,6 +1020,18 @@ impl Fp {
     }
 
     #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+    pub fn mul_inp(&mut self, rhs: &Fp) {
+        unsafe {
+            syscall_bls12381_fp_mulmod(
+                self.0.as_mut_ptr() as *mut u32,
+                rhs.0.as_ptr() as *const u32,
+            );
+        }
+        self.mul_r_inv_internal();
+    }
+
+    #[inline]
     /// CPU version of the multiplication operation. Necessary to prevent syscalls in unconstrained mode.
     pub(crate) fn cpu_mul(&self, rhs: &Fp) -> Fp {
         let (t0, carry) = mac(0, self.0[0], rhs.0[0], 0);
@@ -969,7 +1085,7 @@ impl Fp {
         return self.cpu_mul(rhs);
 
         // RISC0 patch
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             let mut result = [0u32; 12];
             let lhs: &[u32; 12] = bytemuck::cast_ref(&self.0);
@@ -981,7 +1097,7 @@ impl Fp {
         }
 
         // SP1 patch
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
         {
             let mut out = self.clone();
             unsafe {
@@ -1009,6 +1125,17 @@ impl Fp {
         }
     }
 
+    #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+    pub(crate) fn mul_r_inv_internal(&mut self) {
+        unsafe {
+            syscall_bls12381_fp_mulmod(
+                self.0.as_mut_ptr() as *mut u32,
+                R_INV.0.as_ptr() as *const u32,
+            );
+        }
+    }
+
     /// Internal function to multiply the internal representation by `R`, equivalent to transforming from
     /// a plain BigInt form back to the internal Montgomery form.
     /// Used as a bridge between the internal Montgomery representation and the zkvm precompiles.
@@ -1021,7 +1148,27 @@ impl Fp {
     }
 
     #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+    pub(crate) fn mul_r_internal(&mut self) {
+        unsafe {
+            syscall_bls12381_fp_mulmod(self.0.as_mut_ptr() as *mut u32, R.0.as_ptr() as *const u32);
+        }
+    }
+
+    #[inline]
     #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+    pub fn square_inp(&mut self) {
+        unsafe {
+            syscall_bls12381_fp_mulmod(
+                self.0.as_mut_ptr() as *mut u32,
+                self.0.as_ptr() as *const u32,
+            );
+        }
+        self.mul_r_inv_internal();
+    }
+
+    #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
     pub fn square_inp(&mut self) {
         unsafe {
             syscall_bls12381_fp_mulmod(
@@ -1089,7 +1236,7 @@ impl Fp {
         return self.cpu_square();
 
         // RISC0
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         {
             // self * self
             let mut result = [0u32; 12];
@@ -1101,7 +1248,7 @@ impl Fp {
         }
 
         // SP1
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "zkm", target_vendor = "succinct")))]
         {
             let mut out = self.clone();
             unsafe {

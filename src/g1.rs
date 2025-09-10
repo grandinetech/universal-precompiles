@@ -27,6 +27,9 @@ cfg_if::cfg_if! {
 #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
 use sp1_lib::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls12381_double};
 
+#[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+use zkm_lib::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls12381_double};
+
 /// This is an element of $\mathbb{G}_1$ represented in the affine coordinate space.
 /// It is ideal to keep elements in this representation to reduce memory usage and
 /// improve performance through the use of mixed curve model arithmetic.
@@ -184,7 +187,7 @@ where
 impl_binops_additive!(G1Projective, G1Affine);
 impl_binops_additive_specify_output!(G1Affine, G1Projective, G1Projective);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const B: Fp = Fp::from_raw_unchecked([
     0xaa27_0000_000c_fff3,
     0x53cc_0032_fc34_000a,
@@ -194,7 +197,7 @@ const B: Fp = Fp::from_raw_unchecked([
     0x09d6_4551_3d83_de7e,
 ]);
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const B: Fp = Fp::from_raw_unchecked([
     0x0000_0000_0000_0004,
     0x0000_0000_0000_0000,
@@ -217,7 +220,7 @@ impl G1Affine {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G1Affine {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
         return G1Affine {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
@@ -239,7 +242,7 @@ impl G1Affine {
         };
 
         // RISCZero patch
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         return G1Affine {
             x: Fp::from_raw_unchecked([
                 0xfb3a_f00a_db22_c6bb,
@@ -473,7 +476,7 @@ impl G1Affine {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
                 // The add precompile only works when P != Q and P != -Q
                 if self.x != rhs.x {
                     // In this case, we know that P != Q and P != -Q, since both Q and -Q have the same `x` coordinate
@@ -520,7 +523,7 @@ impl G1Affine {
             return self;
         }
         cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
                 self.x.mul_r_inv_internal();
                 self.y.mul_r_inv_internal();
                 unsafe {
@@ -539,7 +542,7 @@ impl G1Affine {
 }
 
 /// A nontrivial third root of unity in Fp
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 pub const BETA: Fp = Fp::from_raw_unchecked([
     0x30f1_361b_798a_64e8,
     0xf3b8_ddab_7ece_5a2a,
@@ -549,7 +552,7 @@ pub const BETA: Fp = Fp::from_raw_unchecked([
     0x051b_a4ab_241b_6160,
 ]);
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 pub const BETA: Fp = Fp::from_raw_unchecked([
     0x2e01_ffff_fffe_fffe,
     0xde17_d813_620a_0002,
@@ -745,7 +748,7 @@ impl G1Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G1Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
         return G1Projective {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
@@ -767,7 +770,7 @@ impl G1Projective {
         };
 
         // RISCZero patch
-        #[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
         return G1Projective {
             x: Fp::from_raw_unchecked([
                 0xfb3a_f00a_db22_c6bb,
@@ -930,7 +933,7 @@ impl G1Projective {
 
     /// Multiply `self` by `crate::BLS_X`, using double and add.
     fn mul_by_x(&self) -> G1Projective {
-        #[cfg(any(not(target_os = "zkvm"), not(target_vendor = "succinct")))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
         {
             let mut xself = G1Projective::identity();
             // NOTE: in BLS12-381 we can just skip the first bit.
@@ -961,6 +964,28 @@ impl G1Projective {
             while x != 0 {
                 tmp = tmp.double();
 
+                if x % 2 == 1 {
+                    xself = xself.add_affine(&tmp);
+                }
+                x >>= 1;
+            }
+            // finally, flip the sign
+            if crate::BLS_X_IS_NEGATIVE {
+                xself = -xself;
+            }
+            xself.into()
+        }
+
+        // ZKM patch
+        #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+        {
+            let mut xself = G1Affine::identity();
+    
+            let mut x = crate::BLS_X >> 1;
+            let mut tmp = G1Affine::from(*self);
+            while x != 0 {
+                tmp = tmp.double();
+    
                 if x % 2 == 1 {
                     xself = xself.add_affine(&tmp);
                 }
