@@ -2,7 +2,6 @@ extern "C" {
     fn syscall_sha256_extend(w: *mut u32);
     fn syscall_sha256_compress(w: *mut u32, state: *mut u32);
 }
-
 #[inline]
 pub fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {
     unsafe {

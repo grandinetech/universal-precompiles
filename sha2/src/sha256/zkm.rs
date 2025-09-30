@@ -1,5 +1,5 @@
 extern "C" {
-    fn syscall_sha256_extend(w: *mut [u32; 64]);    
+    fn syscall_sha256_extend(w: *mut [u32; 64]);
     fn syscall_sha256_compress(w: *mut [u32; 64], state: *mut [u32; 8]);
 }
 
@@ -7,7 +7,7 @@ extern "C" {
 pub fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {
     unsafe {
         for i in 0..blocks.len() {
-            let mut w = [0u32; 64];            
+            let mut w = [0u32; 64];
             for j in 0..16 {
                 w[j] = u32::from_be_bytes([
                     blocks[i][j * 4],
@@ -15,8 +15,8 @@ pub fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {
                     blocks[i][j * 4 + 2],
                     blocks[i][j * 4 + 3],
                 ]);
-            }            
-            syscall_sha256_extend(&mut w as *mut [u32; 64]);            
+            }
+            syscall_sha256_extend(&mut w as *mut [u32; 64]);
             syscall_sha256_compress(&mut w as *mut [u32; 64], state as *mut [u32; 8]);
         }
     }

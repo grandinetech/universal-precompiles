@@ -38,6 +38,7 @@ compress = [] # Expose compress functions
 force-soft = [] # Force software implementation
 force-soft-compact = [] # Force compact software implementation
 asm-aarch64 = ["asm"] # DEPRECATED: use `asm` instead
+zkvm-pico = [] # For Brevis pico zkvm compilation
 
 [package.metadata.docs.rs]
 all-features = true
