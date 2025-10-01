@@ -1,6 +1,8 @@
 //! Implementation of hash-to-field for Scalar values
 
 use super::HashToField;
+
+#[allow(unused_imports)]
 use crate::generic_array::{
     typenum::{U32, U48},
     GenericArray,
@@ -12,6 +14,7 @@ impl HashToField for Scalar {
     type InputLength = U48;
 
     // k = 128
+    #[cfg(not(feature = "zkvm-pico"))]
     type XofOutputLength = U32;
 
     fn from_okm(okm: &GenericArray<u8, U48>) -> Scalar {

@@ -1,4 +1,5 @@
 //! This module provides an implementation of the $\mathbb{G}_1$ group of BLS12-381.
+use cfg_if::cfg_if;
 use core::borrow::Borrow;
 use core::fmt;
 use core::iter::Sum;
@@ -29,6 +30,9 @@ use sp1_lib::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls1238
 
 #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
 use zkm_lib::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls12381_double};
+
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))]
+use pico_patch_libs::{bls12381::decompress_pubkey, syscall_bls12381_add, syscall_bls12381_double};
 
 /// This is an element of $\mathbb{G}_1$ represented in the affine coordinate space.
 /// It is ideal to keep elements in this representation to reduce memory usage and
@@ -187,7 +191,12 @@ where
 impl_binops_additive!(G1Projective, G1Affine);
 impl_binops_additive_specify_output!(G1Affine, G1Projective, G1Projective);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    all(target_vendor = "risc0", feature = "zkvm-pico"),
+))]
 const B: Fp = Fp::from_raw_unchecked([
     0xaa27_0000_000c_fff3,
     0x53cc_0032_fc34_000a,
@@ -197,7 +206,7 @@ const B: Fp = Fp::from_raw_unchecked([
     0x09d6_4551_3d83_de7e,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const B: Fp = Fp::from_raw_unchecked([
     0x0000_0000_0000_0004,
     0x0000_0000_0000_0000,
@@ -220,7 +229,12 @@ impl G1Affine {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G1Affine {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            all(target_vendor = "risc0", feature = "zkvm-pico"),
+        ))]
         return G1Affine {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
@@ -242,7 +256,7 @@ impl G1Affine {
         };
 
         // RISCZero patch
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         return G1Affine {
             x: Fp::from_raw_unchecked([
                 0xfb3a_f00a_db22_c6bb,
@@ -372,10 +386,18 @@ impl G1Affine {
     /// Attempts to deserialize a compressed element. See [`notes::serialization`](crate::notes::serialization)
     /// for details about how group elements are serialized.
     pub fn from_compressed(bytes: &[u8; 48]) -> CtOption<Self> {
-        // We already know the point is on the curve because this is established
-        // by the y-coordinate recovery procedure in from_compressed_unchecked().
-
-        Self::from_compressed_unchecked(bytes).and_then(|p| { CtOption::new(p, p.is_torsion_free()) })
+        cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
+                // by the y-coordinate recovery procedure in decompress_pubkey().
+                let decompressed = decompress_pubkey(bytes).unwrap();
+                // Extra checks do not have to be done because because the precompile already does it for us.
+                G1Affine::from_uncompressed_unchecked(&decompressed)
+            } else {
+                // We already know the point is on the curve because this is established
+                // by the y-coordinate recovery procedure in from_compressed_unchecked().
+                Self::from_compressed_unchecked(bytes).and_then(|p| { CtOption::new(p, p.is_torsion_free()) })
+            }
+        }
     }
 
     /// Attempts to deserialize an uncompressed element, not checking if the
@@ -383,58 +405,67 @@ impl G1Affine {
     /// **This is dangerous to call unless you trust the bytes you are reading; otherwise,
     /// API invariants may be broken.** Please consider using `from_compressed()` instead.
     pub fn from_compressed_unchecked(bytes: &[u8; 48]) -> CtOption<Self> {
-        // Obtain the three flags from the start of the byte sequence
-        let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
-        let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
-        let sort_flag_set = Choice::from((bytes[0] >> 5) & 1);
+        cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
+                // by the y-coordinate recovery procedure in decompress_pubkey().
+                let decompressed = decompress_pubkey(bytes).unwrap();
+                // Extra checks do not have to be done because because the precompile already does it for us.
+                G1Affine::from_uncompressed_unchecked(&decompressed)
+            } else {
+                // Obtain the three flags from the start of the byte sequence
+                let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
+                let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
+                let sort_flag_set = Choice::from((bytes[0] >> 5) & 1);
 
-        // Attempt to obtain the x-coordinate
-        let x = {
-            let mut tmp = [0; 48];
-            tmp.copy_from_slice(&bytes[0..48]);
+                // Attempt to obtain the x-coordinate
+                let x = {
+                    let mut tmp = [0; 48];
+                    tmp.copy_from_slice(&bytes[0..48]);
 
-            // Mask away the flag bits
-            tmp[0] &= 0b0001_1111;
+                    // Mask away the flag bits
+                    tmp[0] &= 0b0001_1111;
 
-            Fp::from_bytes(&tmp)
-        };
+                    Fp::from_bytes(&tmp)
+                };
 
-        x.and_then(|x| {
-            // If the infinity flag is set, return the value assuming
-            // the x-coordinate is zero and the sort bit is not set.
-            //
-            // Otherwise, return a recovered point (assuming the correct
-            // y-coordinate can be found) so long as the infinity flag
-            // was not set.
-            CtOption::new(
-                G1Affine::identity(),
-                infinity_flag_set & // Infinity flag should be set
-                compression_flag_set & // Compression flag should be set
-                (!sort_flag_set) & // Sort flag should not be set
-                x.is_zero(), // The x-coordinate should be zero
-            )
-            .or_else(|| {
-                // Recover a y-coordinate given x by y = sqrt(x^3 + 4)
-                ((x.square() * x) + B).sqrt().and_then(|y| {
-                    // Switch to the correct y-coordinate if necessary.
-                    let y = Fp::conditional_select(
-                        &y,
-                        &-y,
-                        y.lexicographically_largest() ^ sort_flag_set,
-                    );
-
+                x.and_then(|x| {
+                    // If the infinity flag is set, return the value assuming
+                    // the x-coordinate is zero and the sort bit is not set.
+                    //
+                    // Otherwise, return a recovered point (assuming the correct
+                    // y-coordinate can be found) so long as the infinity flag
+                    // was not set.
                     CtOption::new(
-                        G1Affine {
-                            x,
-                            y,
-                            infinity: infinity_flag_set,
-                        },
-                        (!infinity_flag_set) & // Infinity flag should not be set
-                        compression_flag_set, // Compression flag should be set
+                        G1Affine::identity(),
+                        infinity_flag_set & // Infinity flag should be set
+                        compression_flag_set & // Compression flag should be set
+                        (!sort_flag_set) & // Sort flag should not be set
+                        x.is_zero(), // The x-coordinate should be zero
                     )
+                    .or_else(|| {
+                        // Recover a y-coordinate given x by y = sqrt(x^3 + 4)
+                        ((x.square() * x) + B).sqrt().and_then(|y| {
+                            // Switch to the correct y-coordinate if necessary.
+                            let y = Fp::conditional_select(
+                                &y,
+                                &-y,
+                                y.lexicographically_largest() ^ sort_flag_set,
+                            );
+
+                            CtOption::new(
+                                G1Affine {
+                                    x,
+                                    y,
+                                    infinity: infinity_flag_set,
+                                },
+                                (!infinity_flag_set) & // Infinity flag should not be set
+                                compression_flag_set, // Compression flag should be set
+                            )
+                        })
+                    })
                 })
-            })
-        })
+            }
+        }
     }
 
     /// Returns true if this element is the identity (the point at infinity).
@@ -475,8 +506,15 @@ impl G1Affine {
             return *self;
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+        cfg_if! {
+            if #[cfg(all(
+                target_os = "zkvm",
+                any(
+                    target_vendor = "succinct",
+                    target_vendor = "zkm",
+                    all(target_vendor = "risc0", feature = "zkvm-pico"),
+                )
+            ))] {
                 // The add precompile only works when P != Q and P != -Q
                 if self.x != rhs.x {
                     // In this case, we know that P != Q and P != -Q, since both Q and -Q have the same `x` coordinate
@@ -522,8 +560,8 @@ impl G1Affine {
         if self.is_identity().into() {
             return self;
         }
-        cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+        cfg_if! {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                 self.x.mul_r_inv_internal();
                 self.y.mul_r_inv_internal();
                 unsafe {
@@ -542,7 +580,12 @@ impl G1Affine {
 }
 
 /// A nontrivial third root of unity in Fp
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    all(target_vendor = "risc0", feature = "zkvm-pico"),
+))]
 pub const BETA: Fp = Fp::from_raw_unchecked([
     0x30f1_361b_798a_64e8,
     0xf3b8_ddab_7ece_5a2a,
@@ -552,7 +595,7 @@ pub const BETA: Fp = Fp::from_raw_unchecked([
     0x051b_a4ab_241b_6160,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 pub const BETA: Fp = Fp::from_raw_unchecked([
     0x2e01_ffff_fffe_fffe,
     0xde17_d813_620a_0002,
@@ -562,7 +605,7 @@ pub const BETA: Fp = Fp::from_raw_unchecked([
     0x0000_0000_0000_0000,
 ]);
 
-fn endomorphism(p: &G1Affine) -> G1Affine {
+pub fn endomorphism(p: &G1Affine) -> G1Affine {
     // Endomorphism of the points on the curve.
     // endomorphism_p(x,y) = (BETA * x, y)
     // where BETA is a non-trivial cubic root of unity in Fq.
@@ -748,7 +791,12 @@ impl G1Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G1Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            all(target_vendor = "risc0", feature = "zkvm-pico"),
+        ))]
         return G1Projective {
             x: Fp::from_raw_unchecked([
                 0x5cb3_8790_fd53_0c16,
@@ -770,7 +818,7 @@ impl G1Projective {
         };
 
         // RISCZero patch
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         return G1Projective {
             x: Fp::from_raw_unchecked([
                 0xfb3a_f00a_db22_c6bb,
@@ -933,7 +981,11 @@ impl G1Projective {
 
     /// Multiply `self` by `crate::BLS_X`, using double and add.
     fn mul_by_x(&self) -> G1Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "risc0",
+            all(target_vendor = "risc0", feature = "zkvm-pico"),
+        ))]
         {
             let mut xself = G1Projective::identity();
             // NOTE: in BLS12-381 we can just skip the first bit.
@@ -980,12 +1032,12 @@ impl G1Projective {
         #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
         {
             let mut xself = G1Affine::identity();
-    
+
             let mut x = crate::BLS_X >> 1;
             let mut tmp = G1Affine::from(*self);
             while x != 0 {
                 tmp = tmp.double();
-    
+
                 if x % 2 == 1 {
                     xself = xself.add_affine(&tmp);
                 }
@@ -2075,24 +2127,38 @@ fn test_commutative_scalar_subgroup_multiplication() {
     let g1_a = G1Affine::generator();
     let g1_p = G1Projective::generator();
 
-    // By reference. In subfunction to avoid "needlessly taken reference" lint.
-    fn by_ref(g1_a: &G1Affine, g1_p: &G1Projective, a: &Scalar) {
-        assert_eq!(g1_a * a, a * g1_a);
-        assert_eq!(g1_p * a, a * g1_p);
-    }
-    by_ref(&g1_a, &g1_p, &a);
+    cfg_if! {
+        if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
+            // By reference.
+            assert_eq!(&g1_a * &a, &a * &g1_a);
+            assert_eq!(&g1_p * &a, &a * &g1_p);
 
-    // Mixed
-    fn group_ref(g1_a: &G1Affine, g1_p: &G1Projective, a: Scalar) {
-        assert_eq!(g1_a * a, a * g1_a);
-        assert_eq!(g1_p * a, a * g1_p);
+            // Mixed
+            assert_eq!(&g1_a * a.clone(), a.clone() * &g1_a);
+            assert_eq!(&g1_p * a.clone(), a.clone() * &g1_p);
+            assert_eq!(g1_a.clone() * &a, &a * g1_a.clone());
+            assert_eq!(g1_p.clone() * &a, &a * g1_p.clone());
+        } else {
+            // By reference. In subfunction to avoid "needlessly taken reference" lint.
+            fn by_ref(g1_a: &G1Affine, g1_p: &G1Projective, a: &Scalar) {
+                assert_eq!(g1_a * a, a * g1_a);
+                assert_eq!(g1_p * a, a * g1_p);
+            }
+            by_ref(&g1_a, &g1_p, &a);
+
+            // Mixed
+            fn group_ref(g1_a: &G1Affine, g1_p: &G1Projective, a: Scalar) {
+                assert_eq!(g1_a * a, a * g1_a);
+                assert_eq!(g1_p * a, a * g1_p);
+            }
+            fn scalar_ref(g1_a: G1Affine, g1_p: G1Projective, a: &Scalar) {
+                assert_eq!(g1_a * a, a * g1_a);
+                assert_eq!(g1_p * a, a * g1_p);
+            }
+            group_ref(&g1_a, &g1_p, a);
+            scalar_ref(g1_a, g1_p, &a);
+        }
     }
-    fn scalar_ref(g1_a: G1Affine, g1_p: G1Projective, a: &Scalar) {
-        assert_eq!(g1_a * a, a * g1_a);
-        assert_eq!(g1_p * a, a * g1_p);
-    }
-    group_ref(&g1_a, &g1_p, a);
-    scalar_ref(g1_a, g1_p, &a);
 
     // By value.
     assert_eq!(g1_p * a, a * g1_p);

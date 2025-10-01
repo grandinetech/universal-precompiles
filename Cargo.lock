@@ -103,6 +103,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "pairing",
+ "pico-patch-libs",
  "rand",
  "rand_core",
  "rand_xorshift",
@@ -793,6 +794,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81fec4625e73cf41ef4bb6846cafa6d44736525f442ba45e407c4a000a13996f"
 dependencies = [
  "group",
+]
+
+[[package]]
+name = "pico-patch-libs"
+version = "1.1.6"
+source = "git+https://github.com/brevis-network/pico.git#b52a89e4551b3f28086f7aae49505631845bf961"
+dependencies = [
+ "bincode",
+ "serde",
 ]
 
 [[package]]

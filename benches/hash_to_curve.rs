@@ -22,7 +22,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::encode_to_curve(
                         [black_box(message)],
                         black_box(dst),
-                    )
+                    );
                 })
             },
         );
@@ -31,7 +31,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
                     [black_box(message)],
                     black_box(dst),
-                )
+                );
             })
         });
     }
@@ -49,7 +49,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::encode_to_curve(
                         [black_box(message)],
                         black_box(dst),
-                    )
+                    );
                 })
             },
         );
@@ -58,7 +58,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
                     [black_box(message)],
                     black_box(dst),
-                )
+                );
             })
         });
     }

@@ -1,19 +1,30 @@
 //! This module implements hash_to_curve, hash_to_field and related
 //! hashing primitives for use with BLS signatures.
-
+use cfg_if::cfg_if;
 use core::ops::Add;
-
 use subtle::Choice;
 
 pub(crate) mod chain;
 
-mod expand_msg;
-pub use self::expand_msg::{ExpandMessage, ExpandMsgXmd, ExpandMsgXof, Message};
+cfg_if! {
+    if #[cfg(feature = "zkvm-pico")] {
+        mod expand_msg_pico;
+        pub use self::expand_msg_pico::{
+            ExpandMessage, ExpandMessageState, ExpandMsgXmd, ExpandMsgXof, InitExpandMessage, Message
+        };
+    } else {
+        mod expand_msg;
+        pub use self::expand_msg::{
+            ExpandMessage, ExpandMsgXmd, ExpandMsgXof, Message,
+        };
+    }
+}
 
 mod map_g1;
 pub mod map_g2;
 mod map_scalar;
 
+#[allow(unused_imports)]
 use crate::generic_array::{
     typenum::{IsLess, Unsigned, U256},
     ArrayLength, GenericArray,
@@ -36,6 +47,7 @@ pub trait HashToField: Sized {
     ///
     /// This must be set to `ceil(2 * k / 8)`, where `k` is the security parameter. This
     /// is used when handling DST values longer than 255 bytes.
+    #[cfg(not(feature = "zkvm-pico"))]
     type XofOutputLength: ArrayLength<u8> + IsLess<U256>;
 
     /// Interprets the given output keying material as a big endian integer, and reduces
@@ -55,7 +67,20 @@ pub trait HashToField: Sized {
     {
         let len_per_elm = Self::InputLength::to_usize();
         let len_in_bytes = output.len() * len_per_elm;
-        let mut expander = X::init_expand::<M, Self::XofOutputLength>(message, dst, len_in_bytes);
+        let mut expander;
+
+        #[cfg(feature = "zkvm-pico")]
+        {
+            use alloc::vec::Vec;
+            let mut tmp = Vec::new();
+            message.input_message(|m| tmp.extend_from_slice(m));
+            expander = X::init_expand(&tmp[..], dst, len_in_bytes);
+        }
+
+        #[cfg(not(feature = "zkvm-pico"))]
+        {
+            expander = X::init_expand::<M, Self::XofOutputLength>(message, dst, len_in_bytes);
+        }
 
         let mut buf = GenericArray::<u8, Self::InputLength>::default();
         output.iter_mut().for_each(|item| {

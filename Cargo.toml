@@ -28,12 +28,17 @@ zeroize = { version = "1.4", optional = true, default-features = false }
 bytemuck = { version ="1.21.0", features = ["derive", "min_const_generics"]}
 hex = { version = "0.4", optional = true, default-features = false, features = ["alloc"] }
 
-[target.'cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))'.dependencies]
-risc0-bigint2 = { version = "1.4.0-rc.2", default-features = false, features = [ "unstable" ] }
+[target.'cfg(all(target_os = "zkvm", target_vendor = "risc0"))'.dependencies]
+# For r0vm, also have to specify `zkvm-risc0` feature below
+risc0-bigint2 = { version = "1.4.0-rc.2", default-features = false, features = [ "unstable" ], optional = true }
+# For Brevis Pico, also have to specify `zkvm-pico` feature below
+pico-patch-libs = { git = "https://github.com/brevis-network/pico.git", default-features = false, optional = true }
 
+# For Succinct SP1
 [target.'cfg(all(target_os = "zkvm", target_vendor = "succinct"))'.dependencies]
 sp1-lib = { version = "5.0.0", default-features = false }
 
+# For Ziren
 [target.'cfg(all(target_os = "zkvm", target_vendor = "zkm"))'.dependencies]
 zkm-lib = { git = "https://github.com/ProjectZKM/Ziren.git", default-features = false }
 
@@ -54,6 +59,10 @@ pairings = ["groups", "pairing"]
 alloc = ["group/alloc"]
 experimental = ["digest", "groups", "hex"]
 nightly = ["subtle/nightly"]
+# For r0vm
+zkvm-risc0 = ["dep:risc0-bigint2"]
+# For Brevis Pico
+zkvm-pico = ["dep:pico-patch-libs", "alloc"]
 
 [[test]]
 name = "expand_msg"
