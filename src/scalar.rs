@@ -11,11 +11,12 @@ cfg_if! {
     if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
         use sp1_lib::sys_bigint;
         use sp1_lib::{io::{hint_slice, read_vec}, unconstrained};
-    }
-}
-
-cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))] {
+    } else if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))] {
+        use risc0_bigint2::field;
+    } else if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
+        use pico_patch_libs::sys_bigint;
+        use pico_patch_libs::{io::{hint_slice, read_vec}, unconstrained};
+    } else if #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))] {
         use zkm_lib::sys_bigint;
         use zkm_lib::{io::{hint_slice, read_vec}, unconstrained};
     }
@@ -27,9 +28,6 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use ff::{FieldBits, PrimeFieldBits};
 
 use crate::util::{adc, sbb, mac};
-
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
-use risc0_bigint2::field;
 
 /// Represents an element of the scalar field $\mathbb{F}_q$ of the BLS12-381 elliptic
 /// curve construction.
@@ -58,11 +56,14 @@ impl fmt::Display for Scalar {
 
 impl From<u64> for Scalar {
     fn from(val: u64) -> Scalar {
-        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
-        return Scalar([val, 0, 0, 0]) * R2;
-
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
-        return Scalar([val, 0, 0, 0]);
+        cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))] {
+                // target r0vm only
+                return Scalar([val, 0, 0, 0]);
+            } else {
+                return Scalar([val, 0, 0, 0]) * R2;
+            }
+        }
     }
 }
 
@@ -105,7 +106,7 @@ const MODULUS: Scalar = Scalar([
 /// The modulus as u32 limbs.
 #[cfg(any(
     all(feature = "bits", not(target_pointer_width = "64")),
-    all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm"))
+    all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))
 ))]
 const MODULUS_LIMBS_32: [u32; 8] = [
     0x0000_0001,
@@ -118,7 +119,7 @@ const MODULUS_LIMBS_32: [u32; 8] = [
     0x73ed_a753,
 ];
 
-#[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+#[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
 const R_INV: [u32; 8] = [
     0xfe75_c040,
     0x13f7_5b69,
@@ -432,11 +433,13 @@ impl Scalar {
     /// Converts from an integer represented in little endian
     /// into its (congruent) `Scalar` representation.
     pub fn from_raw(val: [u64; 4]) -> Self {
-        #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
-        return (&Scalar(val)).mul(&R2);
-
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
-        return Scalar(val);
+        cfg_if! {
+            if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))] {
+                return Scalar(val);
+            } else {
+                return (&Scalar(val)).mul(&R2);
+            }
+        }
     }
 
     /// Squares this element.
@@ -473,24 +476,24 @@ impl Scalar {
     }
 
     pub fn square(&self) -> Scalar {
-        #[cfg(not(target_os = "zkvm"))]
-        return self.cpu_square();
-
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
-        {
-            let mut result = [0u32; 8];
-            let inp: [u32; 8] = bytemuck::cast(self.0);
-            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
-            field::modmul_256(&inp, &inp, &prime, &mut result);
-            let ret: [u64; 4] = bytemuck::cast(result);
-            Scalar(ret)
-        }
-
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
-        {
-            let mut res = *self;
-            res.mul_inp(self);
-            res
+        cfg_if! {
+            if #[cfg(not(target_os = "zkvm"))] {
+                return self.cpu_square();
+            } else {
+                if #[cfg(all(target_vendor = "risc0", not(feature = "zkvm-pico")))] {
+                    // target r0vm only
+                    let mut result = [0u32; 8];
+                    let inp: [u32; 8] = bytemuck::cast(self.0);
+                    let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+                    field::modmul_256(&inp, &inp, &prime, &mut result);
+                    let ret: [u64; 4] = bytemuck::cast(result);
+                    Scalar(ret)
+                } else {
+                    let mut res = *self;
+                    res.mul_inp(self);
+                    res
+                }
+            }
         }
     }
 
@@ -630,48 +633,66 @@ impl Scalar {
     }
 
     pub fn invert(&self) -> CtOption<Self> {
-        #[cfg(not(target_os = "zkvm"))]
-        return self.cpu_invert();
+        cfg_if! {
+            if #[cfg(not(target_os = "zkvm"))] {
+                return self.cpu_invert();
+            } else {
+                if #[cfg(all(target_vendor = "risc0", not(feature = "zkvm-pico")))] {
+                    // target r0vm
+                    // RISCZero patch: non-Montgomery mult
+                    if self.is_zero().into() {
+                        return CtOption::new(Scalar::zero(), Choice::from(0u8));
+                    }
+                    let mut result = [0u32; 8];
+                    let lhs: [u32; 8] = bytemuck::cast(self.0);
+                    let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
+                    field::modinv_256(&lhs, &prime, &mut result);
+                    let ret: [u64; 4] = bytemuck::cast(result);
+                    CtOption::new(Scalar(ret), Choice::from(1u8))
+                } else if #[cfg(all(target_vendor = "risc0", feature = "zkvm-pico"))] {
+                    unconstrained! {
+                        let mut buf = [0u8; 33];
+                        self.cpu_invert().map(|inv| {
+                            buf[0..32].copy_from_slice(&inv.to_bytes());
+                            buf[32] = 1;
+                        });
+                        hint_slice(&buf);
+                    }
+                    let byte_vec = read_vec();
+                    let bytes: [u8; 33] = byte_vec.try_into().unwrap();
+                    match bytes[32] {
+                        0 => CtOption::new(Scalar::zero(), Choice::from(0u8)),
+                        _ => {
+                            let inv = Scalar::from_bytes(&bytes[0..32].try_into().unwrap()).unwrap();
+                            CtOption::new(inv, (self * inv).ct_eq(&Scalar::one()))
+                        }
+                    }
+                } else if #[cfg(any(target_vendor = "succinct", target_vendor = "zkm"))] {
+                    if self.is_zero().into() {
+                        return CtOption::new(Self::zero(), Choice::from(0u8));
+                    }
+                    unconstrained! {
+                        let mut buf = [0u8; 32];
+                        self.cpu_invert().map(|inv| {
+                            buf[0..32].copy_from_slice(&inv.to_bytes());
+                        });
+                        hint_slice(&buf);
+                    }
+                    let byte_vec = read_vec();
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
-        {
-            // RISCZero patch: non-Montgomery mult
-            if self.is_zero().into() {
-                return CtOption::new(Scalar::zero(), Choice::from(0u8));
+                    // Safety:
+                    //
+                    // - The byte_vec is guaranteed to be 32 bytes long because we just pushed it,
+                    // and the executor always pushes to the front of the input buffer.
+                    //
+                    // `from_scalar` just clones the bytes before byte_vec is dropped.
+                    let bytes = unsafe { &*(byte_vec.as_ptr() as *const [u8; 32]) };
+                    let inv = Scalar::from_bytes(bytes).unwrap();
+
+                    assert!(self * &inv == Scalar::one(), "Invalid hint: Scalar invert");
+                    CtOption::new(inv, Choice::from(1u8))
+                }
             }
-            let mut result = [0u32; 8];
-            let lhs: [u32; 8] = bytemuck::cast(self.0);
-            let prime: [u32; 8] = bytemuck::cast(MODULUS.0);
-            field::modinv_256(&lhs, &prime, &mut result);
-            let ret: [u64; 4] = bytemuck::cast(result);
-            CtOption::new(Scalar(ret), Choice::from(1u8))
-        }
-
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
-        {
-            if self.is_zero().into() {
-                return CtOption::new(Self::zero(), Choice::from(0u8));
-            }
-            unconstrained! {
-                let mut buf = [0u8; 32];
-                self.cpu_invert().map(|inv| {
-                    buf[0..32].copy_from_slice(&inv.to_bytes());
-                });
-                hint_slice(&buf);
-            }
-            let byte_vec = read_vec();
-
-            // Safety:
-            //
-            // - The byte_vec is guaranteed to be 32 bytes long because we just pushed it,
-            // and the executor always pushes to the front of the input buffer.
-            //
-            // `from_scalar` just clones the bytes before byte_vec is dropped.
-            let bytes = unsafe { &*(byte_vec.as_ptr() as *const [u8; 32]) };
-            let inv = Scalar::from_bytes(bytes).unwrap();
-
-            assert!(self * &inv == Scalar::one(), "Invalid hint: Scalar invert");
-            CtOption::new(inv, Choice::from(1u8))
         }
     }
 
@@ -724,7 +745,7 @@ impl Scalar {
     }
 
     #[inline]
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
     pub(crate) fn mul_r_inv_internal(&mut self) {
         unsafe {
             sys_bigint(
@@ -740,7 +761,7 @@ impl Scalar {
     #[inline]
     pub fn mul_inp(&mut self, rhs: &Scalar) {
         cfg_if! {
-            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                 unsafe {
                     sys_bigint(
                         self.0.as_mut_ptr() as *mut[u32; 8],
@@ -790,7 +811,7 @@ impl Scalar {
         #[cfg(not(target_os = "zkvm"))]
         return self.cpu_mul(rhs);
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
         {
             let mut result = [0u32; 8];
             let lhs: [u32; 8] = bytemuck::cast(self.0);
@@ -801,7 +822,7 @@ impl Scalar {
             Scalar(ret)
         }
 
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
         {
             let mut res = *self;
             res.mul_inp(rhs);
