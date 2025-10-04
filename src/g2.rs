@@ -174,7 +174,7 @@ where
 impl_binops_additive!(G2Projective, G2Affine);
 impl_binops_additive_specify_output!(G2Affine, G2Projective, G2Projective);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
 const B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0xaa27_0000_000c_fff3,
@@ -194,7 +194,7 @@ const B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
 const B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x0000_0000_0000_0004,
@@ -214,7 +214,7 @@ const B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
 const B3: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         4933130441833534766,
@@ -234,7 +234,7 @@ const B3: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
 const B3: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x0000_0000_0000_000C,
@@ -753,13 +753,7 @@ fn mul_by_3b(x: &Fp2) -> Fp2 {
 }
 
 #[inline]
-#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-fn mul_by_3b_inp(x: &mut Fp2) {
-    x.mul_inp(&B3);
-}
-
-#[inline]
-#[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+#[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
 fn mul_by_3b_inp(x: &mut Fp2) {
     x.mul_inp(&B3);
 }
@@ -777,7 +771,7 @@ impl G2Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
         return G2Projective {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -818,7 +812,7 @@ impl G2Projective {
             z: Fp2::one(),
         };
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
         return G2Projective {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -862,7 +856,10 @@ impl G2Projective {
 
     /// Computes the doubling of this point.
     pub fn double(&self) -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            all(target_vendor = "risc0", not(feature = "zkvm-pico"))
+        ))]
         {
             // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
             let t0 = self.y.square();
@@ -893,44 +890,8 @@ impl G2Projective {
             G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
         }
         
-        // ZKM
-        #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
-        {
-            // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
-            let mut t0 = self.y.square();
-            let mut z3 = t0;
-            z3.double_inp();
-            z3.double_inp();
-            z3.double_inp();
-            let mut t2 = self.z.square();
-            mul_by_3b_inp(&mut t2);
-            let mut x3 = t2;
-            x3.mul_inp(&z3);
-            let mut y3 = t0;
-            y3.add_inp(&t2);
-            z3.mul_inp(&self.y);
-            z3.mul_inp(&self.z);
-            let tmp = t2;
-            t2.double_inp();
-            t2.add_inp(&tmp);
-            t0.sub_inp(&t2);
-            y3.mul_inp(&t0);
-            y3.add_inp(&x3);
-            t0.mul_inp(&self.x);
-            t0.mul_inp(&self.y);
-            t0.double_inp();
-
-            let tmp = G2Projective {
-                x: t0,
-                y: y3,
-                z: z3,
-            };
-
-            G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
-        }
-
-        // SP1
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        // ZKM & SP1 & Pico
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
         {
             // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
             let mut t0 = self.y.square();
@@ -968,7 +929,10 @@ impl G2Projective {
 
     /// Adds this point to another point.
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            all(target_vendor = "risc0", not(feature = "zkvm-pico"))
+        ))]
         {
             // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
             let t0 = self.x * rhs.x;
@@ -1012,68 +976,8 @@ impl G2Projective {
             }
         }
 
-        // SP1 patch
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-        {
-            // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
-            let mut t0 = self.x;
-            t0.mul_inp(&rhs.x);
-            let mut t1 = self.y;
-            t1.mul_inp(&rhs.y);
-            let mut t2 = self.z;
-            t2.mul_inp(&rhs.z);
-            let mut t3 = self.x;
-            t3.add_inp(&self.y);
-            let mut t4 = rhs.x;
-            t4.add_inp(&rhs.y);
-            t3.mul_inp(&t4);
-            t3.sub_inp(&t0);
-            t3.sub_inp(&t1);
-            let mut t4 = self.y;
-            t4.add_inp(&self.z);
-            let mut x3 = rhs.y;
-            x3.add_inp(&rhs.z);
-            t4.mul_inp(&x3);
-            t4.sub_inp(&t1);
-            t4.sub_inp(&t2);
-            let mut x3 = self.x;
-            x3.add_inp(&self.z);
-            let mut y3 = rhs.x;
-            y3.add_inp(&rhs.z);
-            x3.mul_inp(&y3);
-            let mut y3 = -t0;
-            y3.sub_inp(&t2);
-            y3.add_inp(&x3);
-            let mut x3 = t0;
-            x3.double_inp();
-            t0.add_inp(&x3);
-            mul_by_3b_inp(&mut t2);
-            let mut z3 = t1;
-            z3.add_inp(&t2);
-            t1.sub_inp(&t2);
-            mul_by_3b_inp(&mut y3);
-            let mut x3 = t4;
-            x3.mul_inp(&y3);
-            let mut t2 = t3;
-            t2.mul_inp(&t1);
-            x3 = -x3;
-            x3.add_inp(&t2);
-            y3.mul_inp(&t0);
-            t1.mul_inp(&z3);
-            y3.add_inp(&t1);
-            t0.mul_inp(&t3);
-            z3.mul_inp(&t4);
-            z3.add_inp(&t0);
-
-            G2Projective {
-                x: x3,
-                y: y3,
-                z: z3,
-            }
-        }
-
-        // ZKM patch
-        #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))]
+        // SP1 & ZKM & Pico patch
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
         {
             // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
             let mut t0 = self.x;
@@ -1195,8 +1099,8 @@ impl G2Projective {
         acc
     }
 
-    fn psi(&self) -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+    pub fn psi(&self) -> G2Projective {
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
         {
             // 1 / ((u+1) ^ ((q-1)/3))
             let psi_coeff_x = Fp2 {
@@ -1240,7 +1144,7 @@ impl G2Projective {
             }
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
         {
             // 1 / ((u+1) ^ ((q-1)/3))
             let psi_coeff_x = Fp2 {
@@ -1287,7 +1191,7 @@ impl G2Projective {
 
     fn psi2(&self) -> G2Projective {
         // 1 / 2 ^ ((q-1)/3)
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0xcd03c9e48671f071,
@@ -1300,7 +1204,7 @@ impl G2Projective {
             c1: Fp::zero(),
         };
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0x8bfd_0000_0000_aaac,
@@ -2574,25 +2478,38 @@ fn test_commutative_scalar_subgroup_multiplication() {
     let g2_a = G2Affine::generator();
     let g2_p = G2Projective::generator();
 
-    // By reference. In subfunction to avoid "needlessly taken reference" lint.
-    fn by_ref(g2_a: &G2Affine, g2_p: &G2Projective, a: &Scalar) {
-        assert_eq!(g2_a * a, a * g2_a);
-        assert_eq!(g2_p * a, a * g2_p);
-    }
-    by_ref(&g2_a, &g2_p, &a);
+    cfg_if! {
+        if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
+            // By reference.
+            assert_eq!(&g2_a * &a, &a * &g2_a);
+            assert_eq!(&g2_p * &a, &a * &g2_p);
 
-    // Mixed
-    fn group_ref(g2_a: &G2Affine, g2_p: &G2Projective, a: Scalar) {
-        assert_eq!(g2_a * a, a * g2_a);
-        assert_eq!(g2_p * a, a * g2_p);
-    }
-    fn scalar_ref(g2_a: G2Affine, g2_p: G2Projective, a: &Scalar) {
-        assert_eq!(g2_a * a, a * g2_a);
-        assert_eq!(g2_p * a, a * g2_p);
-    }
-    group_ref(&g2_a, &g2_p, a);
-    scalar_ref(g2_a, g2_p, &a);
+            // Mixed
+            assert_eq!(&g2_a * a.clone(), a.clone() * &g2_a);
+            assert_eq!(&g2_p * a.clone(), a.clone() * &g2_p);
+            assert_eq!(g2_a.clone() * &a, &a * g2_a.clone());
+            assert_eq!(g2_p.clone() * &a, &a * g2_p.clone());
+        } else {
+            // By reference. In subfunction to avoid "needlessly taken reference" lint.
+            fn by_ref(g2_a: &G2Affine, g2_p: &G2Projective, a: &Scalar) {
+                assert_eq!(g2_a * a, a * g2_a);
+                assert_eq!(g2_p * a, a * g2_p);
+            }
+            by_ref(&g2_a, &g2_p, &a);
 
+            // Mixed
+            fn group_ref(g2_a: &G2Affine, g2_p: &G2Projective, a: Scalar) {
+                assert_eq!(g2_a * a, a * g2_a);
+                assert_eq!(g2_p * a, a * g2_p);
+            }
+            fn scalar_ref(g2_a: G2Affine, g2_p: G2Projective, a: &Scalar) {
+                assert_eq!(g2_a * a, a * g2_a);
+                assert_eq!(g2_p * a, a * g2_p);
+            }
+            group_ref(&g2_a, &g2_p, a);
+            scalar_ref(g2_a, g2_p, &a);
+        }
+    }
     // By value.
     assert_eq!(g2_p * a, a * g2_p);
     assert_eq!(g2_a * a, a * g2_a);

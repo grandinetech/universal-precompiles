@@ -49,7 +49,7 @@ impl MillerLoopResult {
         #[must_use]
         fn fp4_square(a: Fp2, b: Fp2) -> (Fp2, Fp2) {
             cfg_if::cfg_if! {
-                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                     // c0 = b.square().mul_by_nonresidue() + a.square()
                     // c1 = (a + b).square() - a.square() - b.square()
                     let mut t0 = a;
@@ -101,7 +101,7 @@ impl MillerLoopResult {
 
             // For A
             cfg_if::cfg_if! {
-                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                     z0 = -z0;
                     z0.add_inp(&t0);
                     z0.double_inp();
@@ -120,7 +120,7 @@ impl MillerLoopResult {
             }
 
             cfg_if::cfg_if! {
-                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                     let (t0, t1) = fp4_square(z2, z3);
                     let (t2, mut t3) = fp4_square(z4, z5);
                 } else {
@@ -151,7 +151,7 @@ impl MillerLoopResult {
 
             // For B
             cfg_if::cfg_if! {
-                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+                if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                     t3.mul_by_nonresidue_inp();
                     z2.add_inp(&t3);
                     z2.double_inp();
@@ -184,7 +184,7 @@ impl MillerLoopResult {
                 },
             }
         }
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
         fn cyclotomic_square_inp(f: &mut Fp12) {
             // z0: f.c0.c0
             // z1: f.c1.c1
@@ -262,7 +262,7 @@ impl MillerLoopResult {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))] {
+            if #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))] {
                 let mut t0 = self.0;
                 t0.frobenius_map_inp();
                 t0.frobenius_map_inp();
@@ -549,7 +549,7 @@ impl Group for Gt {
         Self::identity()
     }
 
-    #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm")))]
+    #[cfg(any(not(target_os = "zkvm"), any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
     fn generator() -> Self {
         // pairing(&G1Affine::generator(), &G2Affine::generator())
         Gt(Fp12 {
@@ -668,7 +668,7 @@ impl Group for Gt {
         })
     }
 
-    #[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
+    #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
     fn generator() -> Self {
         Gt(Fp12 {
             // each const * R_INV (mod p)
@@ -1000,7 +1000,7 @@ fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
 }
 
 fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
-    #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+    #[cfg(any(not(target_os = "zkvm"), all(target_vendor = "risc0", not(feature = "zkvm-pico"))))]
     {
         let mut c0 = coeffs.0;
         let mut c1 = coeffs.1;
@@ -1014,7 +1014,7 @@ fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
         f.mul_by_014(&coeffs.2, &c1, &c0)
     }
 
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
     {
         let mut c0 = coeffs.0;
         let mut c1 = coeffs.1;
@@ -1030,7 +1030,7 @@ fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
 }
 
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
-    #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+    #[cfg(any(not(target_os = "zkvm"), all(target_vendor = "risc0", not(feature = "zkvm-pico"))))]
     {
         // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
         let tmp0 = r.x.square();
@@ -1063,7 +1063,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
     }
 
     // SP1 patch
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
     {
         // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
         let mut tmp0 = r.x;
@@ -1120,7 +1120,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
 }
 
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
-    #[cfg(any(not(target_os = "zkvm"), target_vendor = "risc0"))]
+    #[cfg(any(not(target_os = "zkvm"), all(target_vendor = "risc0", not(feature = "zkvm-pico"))))]
     {
         // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
         let zsquared = r.z.square();
@@ -1154,7 +1154,7 @@ fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
     }
 
     // SP1 patch
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm")))]
+    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
     {
         // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
         let mut zsquared = r.z;
