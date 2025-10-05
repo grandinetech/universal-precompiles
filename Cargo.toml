@@ -28,11 +28,12 @@ zeroize = { version = "1.4", optional = true, default-features = false }
 bytemuck = { version ="1.21.0", features = ["derive", "min_const_generics"]}
 hex = { version = "0.4", optional = true, default-features = false, features = ["alloc"] }
 
-# For r0vm
+# For r0vm, also have to specify the feature below
 [target.'cfg(all(target_os = "zkvm", target_vendor = "risc0"))'.dependencies]
 risc0-bigint2 = { version = "1.4.0-rc.2", default-features = false, features = [ "unstable" ], optional = true }
 
-# For Brevis Pico - selected by feature below
+# For Brevis Pico, also have to specify the feature below
+[target.'cfg(all(target_os = "zkvm", target_vendor = "risc0"))'.dependencies]
 pico-patch-libs = { git = "https://github.com/brevis-network/pico.git", optional = true, default-features = false }
 
 # For Succinct SP1
