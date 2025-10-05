@@ -7,9 +7,8 @@ use core::{
 };
 
 use digest::{
-    Digest, ExtendableOutput, Update, XofReader,
-    core_api::BlockSizeUser, generic_array::typenum::IsLess, FixedOutput,
-    consts::U256
+    consts::U256, core_api::BlockSizeUser, generic_array::typenum::IsLess, Digest,
+    ExtendableOutput, FixedOutput, Update, XofReader,
 };
 
 use crate::generic_array::{
@@ -45,7 +44,7 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
             let mut data = GenericArray::<u8, L>::default();
             H::default()
                 .chain(OVERSIZE_DST_SALT)
-                .chain(&dst)
+                .chain(dst)
                 .finalize_xof()
                 .read(&mut data);
             Self::Hashed(data)
@@ -60,7 +59,7 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         H: Digest<OutputSize = L> + Update,
     {
         if dst.len() > 255 {
-            Self::Hashed(H::new().chain(OVERSIZE_DST_SALT).chain(&dst).finalize())
+            Self::Hashed(H::new().chain(OVERSIZE_DST_SALT).chain(dst).finalize())
         } else {
             Self::Raw(dst)
         }

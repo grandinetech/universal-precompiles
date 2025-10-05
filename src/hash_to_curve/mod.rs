@@ -1,7 +1,7 @@
 //! This module implements hash_to_curve, hash_to_field and related
 //! hashing primitives for use with BLS signatures.
-use core::ops::Add;
 use cfg_if::cfg_if;
+use core::ops::Add;
 use subtle::Choice;
 
 pub(crate) mod chain;

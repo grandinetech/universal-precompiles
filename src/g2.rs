@@ -174,7 +174,12 @@ where
 impl_binops_additive!(G2Projective, G2Affine);
 impl_binops_additive_specify_output!(G2Affine, G2Projective, G2Projective);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0xaa27_0000_000c_fff3,
@@ -194,7 +199,7 @@ const B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x0000_0000_0000_0004,
@@ -214,7 +219,12 @@ const B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const B3: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         4933130441833534766,
@@ -234,7 +244,7 @@ const B3: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const B3: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x0000_0000_0000_000C,
@@ -267,7 +277,11 @@ impl G2Affine {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G2Affine {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm"
+        ))]
         return G2Affine {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -753,7 +767,14 @@ fn mul_by_3b(x: &Fp2) -> Fp2 {
 }
 
 #[inline]
-#[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+#[cfg(all(
+    target_os = "zkvm",
+    any(
+        target_vendor = "succinct",
+        target_vendor = "zkm",
+        feature = "zkvm-pico"
+    )
+))]
 fn mul_by_3b_inp(x: &mut Fp2) {
     x.mul_inp(&B3);
 }
@@ -771,7 +792,12 @@ impl G2Projective {
     /// Returns a fixed generator of the group. See [`notes::design`](notes/design/index.html#fixed-generators)
     /// for how this generator is chosen.
     pub fn generator() -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         return G2Projective {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -812,7 +838,7 @@ impl G2Projective {
             z: Fp2::one(),
         };
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         return G2Projective {
             x: Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -858,7 +884,7 @@ impl G2Projective {
     pub fn double(&self) -> G2Projective {
         #[cfg(any(
             not(target_os = "zkvm"),
-            all(target_vendor = "risc0", not(feature = "zkvm-pico"))
+            all(target_vendor = "risc0", feature = "zkvm-risc0")
         ))]
         {
             // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
@@ -889,9 +915,16 @@ impl G2Projective {
 
             G2Projective::conditional_select(&tmp, &G2Projective::identity(), self.is_identity())
         }
-        
+
         // ZKM & SP1 & Pico
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+        #[cfg(all(
+            target_os = "zkvm",
+            any(
+                target_vendor = "succinct",
+                target_vendor = "zkm",
+                feature = "zkvm-pico"
+            )
+        ))]
         {
             // Algorithm 9, https://eprint.iacr.org/2015/1060.pdf
             let mut t0 = self.y.square();
@@ -931,7 +964,7 @@ impl G2Projective {
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
         #[cfg(any(
             not(target_os = "zkvm"),
-            all(target_vendor = "risc0", not(feature = "zkvm-pico"))
+            all(target_vendor = "risc0", feature = "zkvm-risc0")
         ))]
         {
             // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
@@ -977,7 +1010,14 @@ impl G2Projective {
         }
 
         // SP1 & ZKM & Pico patch
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+        #[cfg(all(
+            target_os = "zkvm",
+            any(
+                target_vendor = "succinct",
+                target_vendor = "zkm",
+                feature = "zkvm-pico"
+            )
+        ))]
         {
             // Algorithm 7, https://eprint.iacr.org/2015/1060.pdf
             let mut t0 = self.x;
@@ -1100,7 +1140,12 @@ impl G2Projective {
     }
 
     pub fn psi(&self) -> G2Projective {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         {
             // 1 / ((u+1) ^ ((q-1)/3))
             let psi_coeff_x = Fp2 {
@@ -1144,7 +1189,7 @@ impl G2Projective {
             }
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         {
             // 1 / ((u+1) ^ ((q-1)/3))
             let psi_coeff_x = Fp2 {
@@ -1191,7 +1236,12 @@ impl G2Projective {
 
     fn psi2(&self) -> G2Projective {
         // 1 / 2 ^ ((q-1)/3)
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0xcd03c9e48671f071,
@@ -1204,7 +1254,7 @@ impl G2Projective {
             c1: Fp::zero(),
         };
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0x8bfd_0000_0000_aaac,

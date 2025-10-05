@@ -14,7 +14,12 @@ use crate::generic_array::{
 };
 
 /// Coefficients of the 11-isogeny x map's numerator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const ISO11_XNUM: [Fp; 12] = [
     Fp::from_raw_unchecked([
         0x4d18_b6f3_af00_131c,
@@ -114,7 +119,7 @@ const ISO11_XNUM: [Fp; 12] = [
     ]),
 ];
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const ISO11_XNUM: [Fp; 12] = [
     Fp::from_raw_unchecked([
         0xaeac_1662_7346_49b7,
@@ -215,7 +220,12 @@ const ISO11_XNUM: [Fp; 12] = [
 ];
 
 /// Coefficients of the 11-isogeny x map's denominator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const ISO11_XDEN: [Fp; 11] = [
     Fp::from_raw_unchecked([
         0xb962_a077_fdb0_f945,
@@ -307,7 +317,7 @@ const ISO11_XDEN: [Fp; 11] = [
     ]),
 ];
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const ISO11_XDEN: [Fp; 11] = [
     Fp::from_raw_unchecked([
         0x993c_f9fa_40d2_1b1c,
@@ -400,7 +410,12 @@ const ISO11_XDEN: [Fp; 11] = [
 ];
 
 /// Coefficients of the 11-isogeny y map's numerator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const ISO11_YNUM: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0x2b56_7ff3_e283_7267,
@@ -532,7 +547,7 @@ const ISO11_YNUM: [Fp; 16] = [
     ]),
 ];
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const ISO11_YNUM: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0xbe9845719707bb33,
@@ -665,7 +680,12 @@ const ISO11_YNUM: [Fp; 16] = [
 ];
 
 /// Coefficients of the 11-isogeny y map's denominator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const ISO11_YDEN: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0xeb6c_359d_47e5_2b1c,
@@ -797,7 +817,7 @@ const ISO11_YDEN: [Fp; 16] = [
     ]),
 ];
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const ISO11_YDEN: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0x01479253b03663c1,
@@ -929,7 +949,12 @@ const ISO11_YDEN: [Fp; 16] = [
     ]),
 ];
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
     0x2f65_aa0e_9af5_aa51,
     0x8646_4c2d_1e84_16c3,
@@ -939,7 +964,7 @@ const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
     0x1554_55c3_e507_1d85,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
     0x5cf4_2808_2d58_4c1d,
     0x9893_6f8d_a0e0_f97f,
@@ -949,7 +974,12 @@ const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
     0x0014_4698_a3b8_e943,
 ]);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
     0xfb99_6971_fe22_a1e0,
     0x9aa9_3eb3_5b74_2d6f,
@@ -959,7 +989,7 @@ const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
     0x0682_4061_418a_386b,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
     0xd1cc_48e9_8e17_2be0,
     0x5a23_215a_316c_eaa5,
@@ -969,7 +999,12 @@ const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
     0x12e2_908d_1168_8030,
 ]);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const SSWU_XI: Fp = Fp::from_raw_unchecked([
     0x886c_0000_0023_ffdc,
     0x0f70_008d_3090_001d,
@@ -979,7 +1014,7 @@ const SSWU_XI: Fp = Fp::from_raw_unchecked([
     0x078c_712f_be0a_b6e8,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const SSWU_XI: Fp = Fp::from_raw_unchecked([
     0x0000_0000_0000_000b,
     0x0000_0000_0000_0000,
@@ -989,7 +1024,12 @@ const SSWU_XI: Fp = Fp::from_raw_unchecked([
     0x0000_0000_0000_0000,
 ]);
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+#[cfg(any(
+    not(target_os = "zkvm"),
+    target_vendor = "succinct",
+    target_vendor = "zkm",
+    feature = "zkvm-pico"
+))]
 const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
     0x43b5_71ca_d321_5f1f,
     0xccb4_60ef_1c70_2dc2,
@@ -999,7 +1039,7 @@ const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
     0x0073_a2af_9892_a2ff,
 ]);
 
-#[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
 const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
     0x6f2d_beab_c2ba_eff5,
     0x8a40_7c9c_6db1_95e0,
@@ -1018,7 +1058,12 @@ impl HashToField for Fp {
     type XofOutputLength = U32;
 
     fn from_okm(okm: &GenericArray<u8, U64>) -> Fp {
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         const F_2_256: Fp = Fp::from_raw_unchecked([
             0x075b_3cd7_c5ce_820f,
             0x3ec6_ba62_1c3e_db0b,
@@ -1028,7 +1073,7 @@ impl HashToField for Fp {
             0x0f96_28b4_9caa_2e85,
         ]);
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         const F_2_256: Fp = Fp::from_raw_unchecked([0, 0, 0, 0, 1, 0]);
 
         let mut bs = [0u8; 48];
@@ -1046,12 +1091,17 @@ impl Sgn0 for Fp {
     fn sgn0(&self) -> Choice {
         // Turn into canonical form by computing
         // (a.R) / R = a
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         let tmp = self;
 
         Choice::from((tmp.0[0] & 1) as u8)

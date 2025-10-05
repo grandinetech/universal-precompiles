@@ -111,7 +111,14 @@ impl Fp6 {
     }
 
     #[inline]
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+    #[cfg(all(
+        target_os = "zkvm",
+        any(
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        )
+    ))]
     pub fn add_inp(&mut self, rhs: &Fp6) {
         self.c0.add_inp(&rhs.c0);
         self.c1.add_inp(&rhs.c1);
@@ -119,7 +126,14 @@ impl Fp6 {
     }
 
     #[inline]
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+    #[cfg(all(
+        target_os = "zkvm",
+        any(
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        )
+    ))]
     pub fn sub_inp(&mut self, rhs: &Fp6) {
         self.c0.sub_inp(&rhs.c0);
         self.c1.sub_inp(&rhs.c1);
@@ -166,7 +180,14 @@ impl Fp6 {
     }
 
     /// Multiply by quadratic nonresidue v.
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+    #[cfg(all(
+        target_os = "zkvm",
+        any(
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        )
+    ))]
     pub fn mul_by_nonresidue_owned(self) -> Self {
         // Given a + bv + cv^2, this produces
         //     av + bv^2 + cv^3
@@ -190,7 +211,12 @@ impl Fp6 {
         let c2 = self.c2.frobenius_map();
 
         // Original zkcrypto implementation. Also used in SP1
-        #[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico"))]
+        #[cfg(any(
+            not(target_os = "zkvm"),
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        ))]
         {
             // c1 = c1 * (u + 1)^((p - 1) / 3)
             let c1 = c1
@@ -222,7 +248,7 @@ impl Fp6 {
 
             Fp6 { c0, c1, c2 }
         }
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         {
             // c1 = c1 * (u + 1)^((p - 1) / 3)
             let c1 = c1
@@ -258,7 +284,14 @@ impl Fp6 {
 
     /// Raises this element to p.
     #[inline]
-    #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+    #[cfg(all(
+        target_os = "zkvm",
+        any(
+            target_vendor = "succinct",
+            target_vendor = "zkm",
+            feature = "zkvm-pico"
+        )
+    ))]
     pub fn frobenius_map_inp(&mut self) {
         self.c0.frobenius_map_inp();
         self.c1.frobenius_map_inp();
@@ -385,7 +418,7 @@ impl Fp6 {
         }
 
         // RISC0
-        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(feature = "zkvm-pico")))]
+        #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
         {
             let a = self;
             let b10_p_b11 = b.c1.c0.add_zkvm(&(b.c1.c1));
@@ -458,7 +491,14 @@ impl Fp6 {
         }
 
         // SP1 && Ziren && Pico
-        #[cfg(all(target_os = "zkvm", any(target_vendor = "succinct", target_vendor = "zkm", feature = "zkvm-pico")))]
+        #[cfg(all(
+            target_os = "zkvm",
+            any(
+                target_vendor = "succinct",
+                target_vendor = "zkm",
+                feature = "zkvm-pico"
+            )
+        ))]
         {
             // Implements Algorithm 13 from https://eprint.iacr.org/2010/354.pdf
             let mut t0 = self.c0;

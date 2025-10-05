@@ -96,10 +96,16 @@ fn encode_to_curve_works_for_draft16_testvectors_g2_sha256_nu() {
     ];
 
     for case in cases {
+        #[cfg(not(feature = "zkvm-pico"))]
         let g = <G2Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::encode_to_curve(
             [case.msg],
             case.dst,
         );
+        #[cfg(feature = "zkvm-pico")]
+        let g = <G2Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::encode_to_curve(
+            case.msg, case.dst,
+        );
+
         let aff = G2Affine::from(g);
         let g_uncompressed = aff.to_uncompressed();
         case.check_output(&g_uncompressed);
@@ -176,10 +182,15 @@ fn hash_to_curve_works_for_draft16_testvectors_g2_sha256_ro() {
     ];
 
     for case in cases {
+        #[cfg(not(feature = "zkvm-pico"))]
         let g = <G2Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::hash_to_curve(
             [case.msg],
             case.dst,
         );
+        #[cfg(feature = "zkvm-pico")]
+        let g =
+            <G2Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::hash_to_curve(case.msg, case.dst);
+
         let aff = G2Affine::from(g);
         let g_uncompressed = aff.to_uncompressed();
         case.check_output(&g_uncompressed);
