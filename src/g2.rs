@@ -2478,7 +2478,7 @@ fn test_commutative_scalar_subgroup_multiplication() {
     let g2_a = G2Affine::generator();
     let g2_p = G2Projective::generator();
 
-    cfg_if! {
+    cfg_if::cfg_if! {
         if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"))] {
             // By reference.
             assert_eq!(&g2_a * &a, &a * &g2_a);
