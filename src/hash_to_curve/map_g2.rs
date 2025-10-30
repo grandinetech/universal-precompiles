@@ -11,7 +11,7 @@ use crate::generic_array::{
 use crate::{fp::Fp, fp2::Fp2, g2::G2Projective};
 
 /// Coefficients of the 3-isogeny x map's numerator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const ISO3_XNUM: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -73,7 +73,7 @@ const ISO3_XNUM: [Fp2; 4] = [
     },
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const ISO3_XNUM: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -136,7 +136,7 @@ const ISO3_XNUM: [Fp2; 4] = [
 ];
 
 /// Coefficients of the 3-isogeny x map's denominator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const ISO3_XDEN: [Fp2; 3] = [
     Fp2 {
         c0: Fp::zero(),
@@ -170,7 +170,7 @@ const ISO3_XDEN: [Fp2; 3] = [
     Fp2::one(),
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const ISO3_XDEN: [Fp2; 3] = [
     Fp2 {
         c0: Fp::zero(),
@@ -205,7 +205,7 @@ const ISO3_XDEN: [Fp2; 3] = [
 ];
 
 /// Coefficients of the 3-isogeny y map's numerator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const ISO3_YNUM: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -267,7 +267,7 @@ const ISO3_YNUM: [Fp2; 4] = [
     },
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const ISO3_YNUM: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -330,7 +330,7 @@ const ISO3_YNUM: [Fp2; 4] = [
 ];
 
 /// Coefficients of the 3-isogeny y map's denominator
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const ISO3_YDEN: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -382,7 +382,7 @@ const ISO3_YDEN: [Fp2; 4] = [
     Fp2::one(),
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const ISO3_YDEN: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -434,7 +434,7 @@ const ISO3_YDEN: [Fp2; 4] = [
     Fp2::one(),
 ];
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const SSWU_ELLP_A: Fp2 = Fp2 {
     c0: Fp::zero(),
     c1: Fp::from_raw_unchecked([
@@ -447,7 +447,7 @@ const SSWU_ELLP_A: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const SSWU_ELLP_A: Fp2 = Fp2 {
     c0: Fp::zero(),
     c1: Fp::from_raw_unchecked([
@@ -460,7 +460,7 @@ const SSWU_ELLP_A: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const SSWU_ELLP_B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x22ea_0000_0cf8_9db2,
@@ -480,7 +480,7 @@ const SSWU_ELLP_B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const SSWU_ELLP_B: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x0000_0000_0000_03f4,
@@ -500,7 +500,7 @@ const SSWU_ELLP_B: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const SSWU_XI: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x87eb_ffff_fff9_555c,
@@ -520,7 +520,7 @@ const SSWU_XI: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const SSWU_XI: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0xb9fe_ffff_ffff_aaa9,
@@ -540,7 +540,7 @@ const SSWU_XI: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const SSWU_ETAS: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -616,7 +616,7 @@ const SSWU_ETAS: [Fp2; 4] = [
     },
 ];
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const SSWU_ETAS: [Fp2; 4] = [
     Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -692,7 +692,7 @@ const SSWU_ETAS: [Fp2; 4] = [
     },
 ];
 
-#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct"))]
+#[cfg(any(not(target_os = "zkvm"), target_vendor = "succinct", target_vendor = "zkm"))]
 const SSWU_RV1: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0x7bcf_a7a2_5aa3_0fda,
@@ -712,7 +712,7 @@ const SSWU_RV1: Fp2 = Fp2 {
     ]),
 };
 
-#[cfg(all(target_os = "zkvm", not(target_vendor = "succinct")))]
+#[cfg(all(target_os = "zkvm", target_vendor = "risc0"))]
 const SSWU_RV1: Fp2 = Fp2 {
     c0: Fp::from_raw_unchecked([
         0xc810_84fb_ede3_cc09,
