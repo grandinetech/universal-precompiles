@@ -16,13 +16,9 @@ fn test_expand_message_parts() {
         &[],
         EXPAND_LEN,
     )
-        .read_into(&mut b1);
+    .read_into(&mut b1);
 
-    <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>(
-        [b"signature"],
-        &[],
-        EXPAND_LEN,
-    )
+    <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>([b"signature"], &[], EXPAND_LEN)
         .read_into(&mut b2);
 
     assert_eq!(b1, b2);
