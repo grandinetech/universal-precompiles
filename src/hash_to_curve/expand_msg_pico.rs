@@ -100,6 +100,27 @@ pub trait InitExpandMessage<'x> {
 // Automatically derive trait
 impl<X: for<'x> InitExpandMessage<'x>> ExpandMessage for X {}
 
+/// A trait allowing flexible support for message input types.
+pub trait Message {
+    /// Consume the message input.
+    ///
+    /// The parameters to successive calls to `f` are treated as a
+    /// single concatenated octet string.
+    fn input_message(self, f: impl FnMut(&[u8]));
+}
+
+impl<M, I> Message for I
+where
+    M: AsRef<[u8]>,
+    I: IntoIterator<Item = M>,
+{
+    fn input_message(self, mut f: impl FnMut(&[u8])) {
+        for msg in self {
+            f(msg.as_ref())
+        }
+    }
+}
+
 /// Trait for types implementing the `expand_message` interface for `hash_to_field`.
 pub trait ExpandMessageState<'x> {
     /// Reads bytes from the generated output.

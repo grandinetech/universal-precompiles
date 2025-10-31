@@ -10,7 +10,7 @@ cfg_if! {
     if #[cfg(feature = "zkvm-pico")] {
         mod expand_msg_pico;
         pub use self::expand_msg_pico::{
-            ExpandMessage, ExpandMessageState, ExpandMsgXmd, ExpandMsgXof, InitExpandMessage
+            ExpandMessage, ExpandMessageState, ExpandMsgXmd, ExpandMsgXof, InitExpandMessage, Message
         };
     } else {
         mod expand_msg;
@@ -60,20 +60,6 @@ pub trait HashToField: Sized {
     /// Implements [section 5.3 of `draft-irtf-cfrg-hash-to-curve-12`][hash_to_field].
     ///
     /// [hash_to_field]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.3
-    #[cfg(feature = "zkvm-pico")]
-    fn hash_to_field<X: ExpandMessage>(message: &[u8], dst: &[u8], output: &mut [Self]) {
-        let len_per_elm = Self::InputLength::to_usize();
-        let len_in_bytes = output.len() * len_per_elm;
-        let mut expander = X::init_expand(message, dst, len_in_bytes);
-
-        let mut buf = GenericArray::<u8, Self::InputLength>::default();
-        output.iter_mut().for_each(|item| {
-            expander.read_into(&mut buf[..]);
-            *item = Self::from_okm(&buf);
-        });
-    }
-
-    #[cfg(not(feature = "zkvm-pico"))]
     fn hash_to_field<X, M>(message: M, dst: &[u8], output: &mut [Self])
     where
         X: ExpandMessage,
@@ -81,7 +67,20 @@ pub trait HashToField: Sized {
     {
         let len_per_elm = Self::InputLength::to_usize();
         let len_in_bytes = output.len() * len_per_elm;
-        let mut expander = X::init_expand::<M, Self::XofOutputLength>(message, dst, len_in_bytes);
+        let mut expander;
+
+        #[cfg(feature = "zkvm-pico")]
+        {
+            use alloc::vec::Vec;
+            let mut tmp = Vec::new();
+            message.input_message(|m| tmp.extend_from_slice(m));
+            expander = X::init_expand(&tmp[..], dst, len_in_bytes);
+        }
+
+        #[cfg(not(feature = "zkvm-pico"))]
+        {
+            expander = X::init_expand::<M, Self::XofOutputLength>(message, dst, len_in_bytes);
+        }
 
         let mut buf = GenericArray::<u8, Self::InputLength>::default();
         output.iter_mut().for_each(|item| {
@@ -109,16 +108,6 @@ pub trait HashToCurve<X: ExpandMessage>: MapToCurve + for<'a> Add<&'a Self, Outp
     ///
     /// This function is suitable for most applications requiring a random
     /// oracle returning points in `Self`.
-    #[cfg(feature = "zkvm-pico")]
-    fn hash_to_curve(message: impl AsRef<[u8]>, dst: &[u8]) -> Self {
-        let mut u = [Self::Field::default(); 2];
-        Self::Field::hash_to_field::<X>(message.as_ref(), dst, &mut u);
-        let p1 = Self::map_to_curve(&u[0]);
-        let p2 = Self::map_to_curve(&u[1]);
-        (p1 + &p2).clear_h()
-    }
-
-    #[cfg(not(feature = "zkvm-pico"))]
     fn hash_to_curve<M: Message>(message: M, dst: &[u8]) -> Self {
         let mut u = [Self::Field::default(); 2];
         Self::Field::hash_to_field::<X, M>(message, dst, &mut u);
@@ -136,15 +125,6 @@ pub trait HashToCurve<X: ExpandMessage>: MapToCurve + for<'a> Add<&'a Self, Outp
     /// for a more precise definition of `encode_to_curve`'s output distribution.
     ///
     /// [encode_to_curve-distribution]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-10.1
-    #[cfg(feature = "zkvm-pico")]
-    fn encode_to_curve(message: impl AsRef<[u8]>, dst: &[u8]) -> Self {
-        let mut u = [Self::Field::default(); 1];
-        Self::Field::hash_to_field::<X>(message.as_ref(), dst, &mut u);
-        let p = Self::map_to_curve(&u[0]);
-        p.clear_h()
-    }
-
-    #[cfg(not(feature = "zkvm-pico"))]
     fn encode_to_curve<M: Message>(message: M, dst: &[u8]) -> Self {
         let mut u = [Self::Field::default(); 1];
         Self::Field::hash_to_field::<X, M>(message, dst, &mut u);

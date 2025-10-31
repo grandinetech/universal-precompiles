@@ -62,7 +62,7 @@ nightly = ["subtle/nightly"]
 # For r0vm
 zkvm-risc0 = ["dep:risc0-bigint2"]
 # For Brevis Pico
-zkvm-pico = ["dep:pico-patch-libs"]
+zkvm-pico = ["dep:pico-patch-libs", "alloc"]
 
 [[test]]
 name = "expand_msg"
