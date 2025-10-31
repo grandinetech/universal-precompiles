@@ -11,36 +11,21 @@ fn test_expand_message_parts() {
     let mut b1 = [0u8; EXPAND_LEN];
     let mut b2 = [0u8; EXPAND_LEN];
 
-    #[cfg(not(feature = "zkvm-pico"))]
-    {
-        <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>(
-            [b"sig" as &[u8], b"nature"],
-            &[],
-            EXPAND_LEN,
-        )
+    <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>(
+        [b"sig" as &[u8], b"nature"],
+        &[],
+        EXPAND_LEN,
+    )
         .read_into(&mut b1);
 
-        <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>(
-            [b"signature"],
-            &[],
-            EXPAND_LEN,
-        )
+    <ExpandMsgXmd<Sha256> as ExpandMessage>::init_expand::<_, U32>(
+        [b"signature"],
+        &[],
+        EXPAND_LEN,
+    )
         .read_into(&mut b2);
 
-        assert_eq!(b1, b2);
-    }
-
-    #[cfg(feature = "zkvm-pico")]
-    {
-        // dummy test case for zkvm-pico
-        <ExpandMsgXmd<Sha256> as InitExpandMessage>::init_expand(b"signature", &[], EXPAND_LEN)
-            .read_into(&mut b1);
-
-        <ExpandMsgXmd<Sha256> as InitExpandMessage>::init_expand(b"signature", &[], EXPAND_LEN)
-            .read_into(&mut b2);
-
-        assert_eq!(b1, b2);
-    }
+    assert_eq!(b1, b2);
 }
 
 struct TestCase {
@@ -55,12 +40,7 @@ impl TestCase {
     pub fn run<E: ExpandMessage>(self) {
         let mut buf = [0u8; 128];
         let output = &mut buf[..self.len_in_bytes];
-
-        #[cfg(not(feature = "zkvm-pico"))]
         E::init_expand::<_, U32>([self.msg], self.dst, self.len_in_bytes).read_into(output);
-        #[cfg(feature = "zkvm-pico")]
-        E::init_expand(self.msg, self.dst, self.len_in_bytes).read_into(output);
-
         if output != self.uniform_bytes {
             panic!(
                 "Failed: expand_message.\n\

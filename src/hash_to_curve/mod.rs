@@ -57,9 +57,9 @@ pub trait HashToField: Sized {
     /// Hashes a byte string of arbitrary length into one or more elements of `Self`,
     /// using [`ExpandMessage`] variant `X`.
     ///
-    /// Implements [section 5.3 of `draft-irtf-cfrg-hash-to-curve-12`][hash_to_field].
+    /// Implements [section 5.2 of `draft-irtf-cfrg-hash-to-curve-16`][hash_to_field].
     ///
-    /// [hash_to_field]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.3
+    /// [hash_to_field]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#section-5.2
     fn hash_to_field<X, M>(message: M, dst: &[u8], output: &mut [Self])
     where
         X: ExpandMessage,
@@ -121,10 +121,10 @@ pub trait HashToCurve<X: ExpandMessage>: MapToCurve + for<'a> Add<&'a Self, Outp
     /// The distribution of its output is not uniformly random in `Self`: the set of
     /// possible outputs of this function is only a fraction of the points in `Self`, and
     /// some elements of this set are more likely to be output than others. See
-    /// [section 10.1 of `draft-irtf-cfrg-hash-to-curve-12`][encode_to_curve-distribution]
+    /// [section 10.4 of `draft-irtf-cfrg-hash-to-curve-16`][encode_to_curve-distribution]
     /// for a more precise definition of `encode_to_curve`'s output distribution.
     ///
-    /// [encode_to_curve-distribution]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-10.1
+    /// [encode_to_curve-distribution]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-16#section-10.4
     fn encode_to_curve<M: Message>(message: M, dst: &[u8]) -> Self {
         let mut u = [Self::Field::default(); 1];
         Self::Field::hash_to_field::<X, M>(message, dst, &mut u);
