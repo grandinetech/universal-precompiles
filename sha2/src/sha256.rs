@@ -37,7 +37,7 @@ cfg_if::cfg_if! {
         mod risc0;
         use risc0::compress;
     } else if #[cfg(all(target_os = "zkvm", target_vendor = "risc0", not(any(feature = "zkvm-pico", feature = "zkvm-risc0"))))] {
-        compile_error!("please select at least one feature from [`zkvm-pico`, `zkvm-risc0`]");
+        compile_error!("please select one of the features from [`zkvm-pico`, `zkvm-risc0`]");
     } else if #[cfg(all(target_os = "zkvm", target_vendor = "zkm", target_arch = "mips"))] {
         mod zkm;
         use zkm::compress;
