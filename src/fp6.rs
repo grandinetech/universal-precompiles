@@ -215,6 +215,7 @@ impl Fp6 {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         {
@@ -340,7 +341,7 @@ impl Fp6 {
     #[inline]
     fn mul_interleaved(&self, b: &Self) -> Self {
         // Original zkcrypto implementation
-        #[cfg(not(target_os = "zkvm"))]
+        #[cfg(any(not(target_os = "zkvm"), target_vendor = "zisk"))]
         {
             // The intuition for this algorithm is that we can look at F_p^6 as a direct
             // extension of F_p^2, and express the overall operations down to the base field

@@ -18,6 +18,7 @@ use crate::generic_array::{
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico")
 ))]
 const ISO11_XNUM: [Fp; 12] = [
@@ -224,6 +225,7 @@ const ISO11_XNUM: [Fp; 12] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO11_XDEN: [Fp; 11] = [
@@ -414,6 +416,7 @@ const ISO11_XDEN: [Fp; 11] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO11_YNUM: [Fp; 16] = [
@@ -684,6 +687,7 @@ const ISO11_YNUM: [Fp; 16] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO11_YDEN: [Fp; 16] = [
@@ -953,6 +957,7 @@ const ISO11_YDEN: [Fp; 16] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
@@ -978,6 +983,7 @@ const SSWU_ELLP_A: Fp = Fp::from_raw_unchecked([
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
@@ -1003,6 +1009,7 @@ const SSWU_ELLP_B: Fp = Fp::from_raw_unchecked([
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_XI: Fp = Fp::from_raw_unchecked([
@@ -1028,6 +1035,7 @@ const SSWU_XI: Fp = Fp::from_raw_unchecked([
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
@@ -1062,6 +1070,7 @@ impl HashToField for Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         const F_2_256: Fp = Fp::from_raw_unchecked([
@@ -1095,6 +1104,7 @@ impl Sgn0 for Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         let tmp = Fp::montgomery_reduce(

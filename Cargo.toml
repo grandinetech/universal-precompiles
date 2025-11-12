@@ -42,6 +42,10 @@ sp1-lib = { version = "5.0.0", default-features = false }
 [target.'cfg(all(target_os = "zkvm", target_vendor = "zkm"))'.dependencies]
 zkm-lib = { git = "https://github.com/ProjectZKM/Ziren.git", default-features = false }
 
+# For Zisk
+[target.'cfg(all(target_os = "zkvm", target_vendor = "zisk"))'.dependencies]
+ziskos = { git = "https://github.com/0xPolygonHermez/zisk.git", tag = "v0.13.0" }
+
 [dev-dependencies]
 csv = ">= 1.0, < 1.2" # csv 1.2 has MSRV 1.60
 criterion = "0.3"
@@ -85,3 +89,6 @@ required-features = ["groups"]
 name = "hash_to_curve"
 harness = false
 required-features = ["experimental"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_vendor, values("succinct", "risc0", "zisk", "zkm"))'] }

@@ -622,6 +622,7 @@ impl Group for Gt {
         any(
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         )
     ))]
@@ -1077,6 +1078,7 @@ fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
 fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
     #[cfg(any(
         not(target_os = "zkvm"),
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-risc0")
     ))]
     {
@@ -1117,6 +1119,7 @@ fn ell(f: &Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
     #[cfg(any(
         not(target_os = "zkvm"),
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-risc0")
     ))]
     {
@@ -1217,6 +1220,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
     #[cfg(any(
         not(target_os = "zkvm"),
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-risc0")
     ))]
     {
