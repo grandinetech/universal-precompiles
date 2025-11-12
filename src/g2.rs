@@ -178,6 +178,7 @@ impl_binops_additive_specify_output!(G2Affine, G2Projective, G2Projective);
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const B: Fp2 = Fp2 {
@@ -223,6 +224,7 @@ const B: Fp2 = Fp2 {
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const B3: Fp2 = Fp2 {
@@ -280,7 +282,8 @@ impl G2Affine {
         #[cfg(any(
             not(target_os = "zkvm"),
             target_vendor = "succinct",
-            target_vendor = "zkm"
+            target_vendor = "zkm",
+            target_vendor = "zisk",
         ))]
         return G2Affine {
             x: Fp2 {
@@ -800,6 +803,7 @@ impl G2Projective {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         return G2Projective {
@@ -888,6 +892,7 @@ impl G2Projective {
     pub fn double(&self) -> G2Projective {
         #[cfg(any(
             not(target_os = "zkvm"),
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-risc0")
         ))]
         {
@@ -968,6 +973,7 @@ impl G2Projective {
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
         #[cfg(any(
             not(target_os = "zkvm"),
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-risc0")
         ))]
         {
@@ -1148,6 +1154,7 @@ impl G2Projective {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         {
@@ -1244,6 +1251,7 @@ impl G2Projective {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         let psi2_coeff_x = Fp2 {

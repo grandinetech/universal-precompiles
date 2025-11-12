@@ -19,6 +19,8 @@ cfg_if! {
     } else if #[cfg(all(target_os = "zkvm", target_vendor = "zkm"))] {
         use zkm_lib::sys_bigint;
         use zkm_lib::{io::{hint_slice, read_vec}, unconstrained};
+    } else if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+        use ziskos::zisklib::{add_fr_bls12_381_ptr, mul_fr_bls12_381_ptr, square_fr_bls12_381_ptr, sub_fr_bls12_381_ptr, neg_fr_bls12_381_ptr, dbl_fr_bls12_381_ptr};
     }
 }
 
@@ -145,6 +147,14 @@ const R_INV: [u32; 8] = [
     0x1bbe_8693,
 ];
 
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+const R_INV: [u64; 4] = [
+    0x13f7_5b69_fe75_c040,
+    0xab6f_ca8f_09dc_705f,
+    0x7204_078a_4f77_266a,
+    0x1bbe_8693_3000_9d57,
+];
+
 // The number of bits needed to represent the modulus.
 const MODULUS_BITS: u32 = 255;
 
@@ -154,6 +164,7 @@ const MODULUS_BITS: u32 = 255;
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -245,6 +256,7 @@ const R2: Scalar = Scalar([
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -261,6 +273,7 @@ const R3: Scalar = Scalar([
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -294,6 +307,7 @@ const S: u32 = 32;
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -318,6 +332,7 @@ const ROOT_OF_UNITY: Scalar = Scalar([
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -343,6 +358,7 @@ const ROOT_OF_UNITY_INV: Scalar = Scalar([
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         feature = "zkvm-pico"
     )
 ))]
@@ -386,6 +402,7 @@ impl Scalar {
             any(
                 target_vendor = "succinct",
                 target_vendor = "zkm",
+                target_vendor = "zisk",
                 all(target_vendor = "risc0", feature = "zkvm-pico"),
             )
         ))]
@@ -399,8 +416,22 @@ impl Scalar {
     /// Doubles this field element.
     #[inline]
     pub fn double(&self) -> Scalar {
-        // TODO: This can be achieved more efficiently with a bitshift.
-        self.add(self)
+        // non-Zisk
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+        {
+            // TODO: This can be achieved more efficiently with a bitshift.
+            self.add(self)
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                dbl_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
+            }
+            out
+        }
     }
 
     /// Attempts to convert a little-endian byte representation of
@@ -431,6 +462,7 @@ impl Scalar {
             any(
                 target_vendor = "succinct",
                 target_vendor = "zkm",
+                target_vendor = "zisk",
                 all(target_vendor = "risc0", feature = "zkvm-pico"),
             )
         ))]
@@ -451,6 +483,7 @@ impl Scalar {
             any(
                 target_vendor = "succinct",
                 target_vendor = "zkm",
+                target_vendor = "zisk",
                 all(target_vendor = "risc0", feature = "zkvm-pico"),
             )
         ))]
@@ -505,6 +538,7 @@ impl Scalar {
             any(
                 target_vendor = "succinct",
                 target_vendor = "zkm",
+                target_vendor = "zisk",
                 all(target_vendor = "risc0", feature = "zkvm-pico"),
             )
         ))]
@@ -573,7 +607,13 @@ impl Scalar {
                 field::modmul_256(&inp, &inp, &prime, &mut result);
                 let ret: [u64; 4] = bytemuck::cast(result);
                 Scalar(ret)
-
+            } else if #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))] {
+                let mut out = self.clone();
+                unsafe {
+                    square_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
+                }
+                out.mul_r_inv_internal();
+                out
             } else {
                 let mut res = *self;
                 res.mul_inp(self);
@@ -719,7 +759,10 @@ impl Scalar {
 
     pub fn invert(&self) -> CtOption<Self> {
         cfg_if! {
-            if #[cfg(not(target_os = "zkvm"))] {
+            if #[cfg(any(
+                not(target_os = "zkvm"),
+                target_vendor = "zisk",
+            ))] {
                 self.cpu_invert()
 
             } else if #[cfg(all(target_vendor = "risc0", feature = "zkvm-risc0"))] {
@@ -830,23 +873,36 @@ impl Scalar {
     }
 
     #[inline]
-    #[cfg(all(
-        target_os = "zkvm",
-        any(
-            target_vendor = "succinct",
-            target_vendor = "zkm",
-            all(target_vendor = "risc0", feature = "zkvm-pico"),
-        )
-    ))]
+    #[allow(dead_code)]
     pub(crate) fn mul_r_inv_internal(&mut self) {
-        unsafe {
-            sys_bigint(
-                self.0.as_mut_ptr() as *mut [u32; 8],
-                0,
-                self.0.as_ptr() as *const [u32; 8],
-                &R_INV,
-                &MODULUS_LIMBS_32,
-            );
+        #[cfg(all(
+            target_os = "zkvm",
+            any(
+                target_vendor = "succinct",
+                target_vendor = "zkm",
+                all(target_vendor = "risc0", feature = "zkvm-pico"),
+            )
+        ))]
+        {
+            unsafe {
+                sys_bigint(
+                    self.0.as_mut_ptr() as *mut [u32; 8],
+                    0,
+                    self.0.as_ptr() as *const [u32; 8],
+                    &R_INV,
+                    &MODULUS_LIMBS_32,
+                );
+            }
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            unsafe {
+                mul_fr_bls12_381_ptr(
+                    self.0.as_mut_ptr() as *mut u64,
+                    R_INV.as_ptr() as *const u64,
+                );
+            }
         }
     }
 
@@ -934,24 +990,49 @@ impl Scalar {
             res.mul_inp(rhs);
             res
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                mul_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
+            }
+            out.mul_r_inv_internal();
+            out
+        }
     }
 
     /// Subtracts `rhs` from `self`, returning the result.
     #[inline]
-    pub const fn sub(&self, rhs: &Self) -> Self {
-        let (d0, borrow) = sbb(self.0[0], rhs.0[0], 0);
-        let (d1, borrow) = sbb(self.0[1], rhs.0[1], borrow);
-        let (d2, borrow) = sbb(self.0[2], rhs.0[2], borrow);
-        let (d3, borrow) = sbb(self.0[3], rhs.0[3], borrow);
+    pub fn sub(&self, rhs: &Self) -> Self {
+        // non-Zisk
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+        {
+            let (d0, borrow) = sbb(self.0[0], rhs.0[0], 0);
+            let (d1, borrow) = sbb(self.0[1], rhs.0[1], borrow);
+            let (d2, borrow) = sbb(self.0[2], rhs.0[2], borrow);
+            let (d3, borrow) = sbb(self.0[3], rhs.0[3], borrow);
 
-        // If underflow occurred on the final limb, borrow = 0xfff...fff, otherwise
-        // borrow = 0x000...000. Thus, we use it as a mask to conditionally add the modulus.
-        let (d0, carry) = adc(d0, MODULUS.0[0] & borrow, 0);
-        let (d1, carry) = adc(d1, MODULUS.0[1] & borrow, carry);
-        let (d2, carry) = adc(d2, MODULUS.0[2] & borrow, carry);
-        let (d3, _) = adc(d3, MODULUS.0[3] & borrow, carry);
+            // If underflow occurred on the final limb, borrow = 0xfff...fff, otherwise
+            // borrow = 0x000...000. Thus, we use it as a mask to conditionally add the modulus.
+            let (d0, carry) = adc(d0, MODULUS.0[0] & borrow, 0);
+            let (d1, carry) = adc(d1, MODULUS.0[1] & borrow, carry);
+            let (d2, carry) = adc(d2, MODULUS.0[2] & borrow, carry);
+            let (d3, _) = adc(d3, MODULUS.0[3] & borrow, carry);
 
-        Scalar([d0, d1, d2, d3])
+            Scalar([d0, d1, d2, d3])
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                sub_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
+            }
+            out
+        }
     }
 
     /// Adds `rhs` to `self`, returning the result.
@@ -989,24 +1070,49 @@ impl Scalar {
             let ret: [u64; 4] = bytemuck::cast(result);
             Scalar(ret)
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                add_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
+            }
+            out
+        }
     }
 
     /// Negates `self`.
     #[inline]
-    pub const fn neg(&self) -> Self {
-        // Subtract `self` from `MODULUS` to negate. Ignore the final
-        // borrow because it cannot underflow; self is guaranteed to
-        // be in the field.
-        let (d0, borrow) = sbb(MODULUS.0[0], self.0[0], 0);
-        let (d1, borrow) = sbb(MODULUS.0[1], self.0[1], borrow);
-        let (d2, borrow) = sbb(MODULUS.0[2], self.0[2], borrow);
-        let (d3, _) = sbb(MODULUS.0[3], self.0[3], borrow);
+    pub fn neg(&self) -> Self {
+        // non-Zisk
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
+        {
+            // Subtract `self` from `MODULUS` to negate. Ignore the final
+            // borrow because it cannot underflow; self is guaranteed to
+            // be in the field.
+            let (d0, borrow) = sbb(MODULUS.0[0], self.0[0], 0);
+            let (d1, borrow) = sbb(MODULUS.0[1], self.0[1], borrow);
+            let (d2, borrow) = sbb(MODULUS.0[2], self.0[2], borrow);
+            let (d3, _) = sbb(MODULUS.0[3], self.0[3], borrow);
 
-        // `tmp` could be `MODULUS` if `self` was zero. Create a mask that is
-        // zero if `self` was zero, and `u64::max_value()` if self was nonzero.
-        let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0) as u64).wrapping_sub(1);
+            // `tmp` could be `MODULUS` if `self` was zero. Create a mask that is
+            // zero if `self` was zero, and `u64::max_value()` if self was nonzero.
+            let mask =
+                (((self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0) as u64).wrapping_sub(1);
 
-        Scalar([d0 & mask, d1 & mask, d2 & mask, d3 & mask])
+            Scalar([d0 & mask, d1 & mask, d2 & mask, d3 & mask])
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                neg_fr_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
+            }
+            out
+        }
     }
 
     #[inline]

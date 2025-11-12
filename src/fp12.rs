@@ -117,6 +117,7 @@ impl Fp12 {
     pub fn mul_by_014(&self, c0: &Fp2, c1: &Fp2, c4: &Fp2) -> Fp12 {
         #[cfg(any(
             not(target_os = "zkvm"),
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-risc0")
         ))]
         {
@@ -233,6 +234,7 @@ impl Fp12 {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ),
         inline(always)
@@ -246,6 +248,7 @@ impl Fp12 {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         let c1 = c1
@@ -338,6 +341,7 @@ impl Fp12 {
     pub fn square(&self) -> Self {
         #[cfg(any(
             not(target_os = "zkvm"),
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-risc0"),
         ))]
         {

@@ -34,6 +34,12 @@ use pico_patch_libs::{
     unconstrained,
 };
 
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+use ziskos::zisklib::{
+    add_fp2_bls12_381_ptr, inv_fp2_bls12_381_ptr, mul_fp2_bls12_381_ptr, neg_fp2_bls12_381_ptr,
+    square_fp2_bls12_381_ptr, sub_fp2_bls12_381_ptr,
+};
+
 #[derive(Copy, Clone)]
 #[cfg_attr(
     all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"),
@@ -276,6 +282,15 @@ impl Fp2 {
         )
     }
 
+    #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    pub fn to_u64(&self) -> [u64; 12] {
+        let mut res = [0u64; 12];
+        res[..6].copy_from_slice(&self.c0.to_u64());
+        res[6..].copy_from_slice(&self.c1.to_u64());
+        res
+    }
+
     /// Internal function to multiply the internal representation by `R_INV`, equivalent to transforming from
     /// the internal Montgomery form to a plain BigInt form.
     /// Used as a bridge between the internal Montgomery representation and the zkvm precompiles.
@@ -285,12 +300,30 @@ impl Fp2 {
         any(
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         )
     ))]
     pub(crate) fn mul_r_inv_internal(&mut self) {
         self.c0.mul_r_inv_internal();
         self.c1.mul_r_inv_internal();
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    pub(crate) fn mul_r_inv(&self) -> Fp2 {
+        Fp2 {
+            c0: self.c0.mul_r_inv(),
+            c1: self.c1.mul_r_inv(),
+        }
+    }
+
+    #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    pub(crate) fn mul_r_internal(&mut self) {
+        self.c0.mul_r_internal();
+        self.c1.mul_r_internal();
     }
 
     #[inline]
@@ -376,6 +409,17 @@ impl Fp2 {
             out.mul_r_inv_internal();
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                square_fp2_bls12_381_ptr(out.c0.0.as_mut_ptr() as *mut u64);
+            }
+            out.mul_r_inv_internal();
+            out
+        }
     }
 
     #[inline]
@@ -452,6 +496,20 @@ impl Fp2 {
                 syscall_bls12381_fp2_mulmod(
                     out.c0.0.as_mut_ptr() as *mut u32,
                     rhs.c0.0.as_ptr() as *const u32,
+                );
+            }
+            out.mul_r_inv_internal();
+            out
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                mul_fp2_bls12_381_ptr(
+                    out.c0.0.as_mut_ptr() as *mut u64,
+                    rhs.c0.0.as_ptr() as *const u64,
                 );
             }
             out.mul_r_inv_internal();
@@ -543,6 +601,19 @@ impl Fp2 {
             }
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                add_fp2_bls12_381_ptr(
+                    out.c0.0.as_mut_ptr() as *mut u64,
+                    rhs.c0.0.as_ptr() as *const u64,
+                );
+            }
+            out
+        }
     }
 
     #[inline]
@@ -610,6 +681,19 @@ impl Fp2 {
             }
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                sub_fp2_bls12_381_ptr(
+                    out.c0.0.as_mut_ptr() as *mut u64,
+                    rhs.c0.0.as_ptr() as *const u64,
+                );
+            }
+            out
+        }
     }
 
     /// CPU version of the negation operation. Necessary to prevent syscalls in unconstrained mode.
@@ -651,6 +735,16 @@ impl Fp2 {
                     out.c0.0.as_mut_ptr() as *mut u32,
                     self.c0.0.as_ptr() as *const u32,
                 );
+            }
+            out
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                neg_fp2_bls12_381_ptr(out.c0.0.as_mut_ptr() as *mut u64);
             }
             out
         }
@@ -716,7 +810,8 @@ impl Fp2 {
         // Original zkcrypto implementation.
         #[cfg(any(
             not(target_os = "zkvm"),
-            all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-pico"),
+            target_vendor = "zisk",
+            all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         return self.cpu_sqrt();
 
@@ -855,6 +950,7 @@ impl Fp2 {
     /// element, returning None in the case that this element
     /// is zero.
     /// CPU version of the inversion operation. Necessary to prevent syscalls in unconstrained mode.
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     pub(crate) fn cpu_invert(&self) -> CtOption<Self> {
         // We wish to find the multiplicative inverse of a nonzero
         // element a + bu in Fp2. We leverage an identity
@@ -879,6 +975,10 @@ impl Fp2 {
     }
 
     pub fn invert(&self) -> CtOption<Self> {
+        if self.is_zero().into() {
+            return CtOption::new(Fp2::zero(), Choice::from(0u8));
+        }
+
         #[cfg(not(target_os = "zkvm"))]
         return self.cpu_invert();
 
@@ -943,10 +1043,6 @@ impl Fp2 {
         // SP1 patched version
         #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
         {
-            if self.is_zero().into() {
-                return CtOption::new(Fp2::zero(), Choice::from(0u8));
-            }
-
             unconstrained! {
                 // The element was previously checked to be non-zero
                 if let Some(inv) = self.cpu_invert().into_option() {
@@ -968,6 +1064,18 @@ impl Fp2 {
             let inv = Fp2::from_bytes(bytes).unwrap();
 
             CtOption::new(inv, (self * inv).ct_eq(&Fp2::one()))
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            out.mul_r_inv_internal();
+            unsafe {
+                inv_fp2_bls12_381_ptr(out.c0.0.as_mut_ptr() as *mut u64);
+            }
+            out.mul_r_internal();
+            CtOption::new(out, Choice::from(1u8))
         }
     }
 

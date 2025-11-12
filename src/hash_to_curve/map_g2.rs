@@ -17,6 +17,7 @@ use crate::{fp::Fp, fp2::Fp2, g2::G2Projective};
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO3_XNUM: [Fp2; 4] = [
@@ -147,6 +148,7 @@ const ISO3_XNUM: [Fp2; 4] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO3_XDEN: [Fp2; 3] = [
@@ -221,6 +223,7 @@ const ISO3_XDEN: [Fp2; 3] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO3_YNUM: [Fp2; 4] = [
@@ -351,6 +354,7 @@ const ISO3_YNUM: [Fp2; 4] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const ISO3_YDEN: [Fp2; 4] = [
@@ -460,6 +464,7 @@ const ISO3_YDEN: [Fp2; 4] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_ELLP_A: Fp2 = Fp2 {
@@ -491,6 +496,7 @@ const SSWU_ELLP_A: Fp2 = Fp2 {
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_ELLP_B: Fp2 = Fp2 {
@@ -536,6 +542,7 @@ const SSWU_ELLP_B: Fp2 = Fp2 {
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_XI: Fp2 = Fp2 {
@@ -581,6 +588,7 @@ const SSWU_XI: Fp2 = Fp2 {
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_ETAS: [Fp2; 4] = [
@@ -738,6 +746,7 @@ const SSWU_ETAS: [Fp2; 4] = [
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const SSWU_RV1: Fp2 = Fp2 {

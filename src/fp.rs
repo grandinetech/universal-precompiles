@@ -36,6 +36,12 @@ use pico_patch_libs::{
     unconstrained,
 };
 
+#[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+use ziskos::zisklib::{
+    add_fp_bls12_381_ptr, inv_fp_bls12_381_ptr, mul_fp_bls12_381, mul_fp_bls12_381_ptr,
+    neg_fp_bls12_381_ptr, sqrt_fp_bls12_381_ptr, square_fp_bls12_381_ptr, sub_fp_bls12_381_ptr,
+};
+
 // The internal representation of this type is six 64-bit unsigned
 // integers in little-endian order. `Fp` values are always in
 // Montgomery form; i.e., Scalar(a) = aR mod p, with R = 2^384.
@@ -57,6 +63,7 @@ use pico_patch_libs::{
         any(
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             feature = "zkvm-pico"
         )
     ),
@@ -151,6 +158,7 @@ const INV: u64 = 0x89f3_fffc_fffc_fffd;
     any(
         target_vendor = "succinct",
         target_vendor = "zkm",
+        target_vendor = "zisk",
         all(target_vendor = "risc0", feature = "zkvm-pico"),
     )
 ))]
@@ -188,6 +196,7 @@ const R2: Fp = Fp([
     not(target_os = "zkvm"),
     target_vendor = "succinct",
     target_vendor = "zkm",
+    target_vendor = "zisk",
     all(target_vendor = "risc0", feature = "zkvm-pico"),
 ))]
 const R3: Fp = Fp([
@@ -262,6 +271,7 @@ impl Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         {
@@ -308,6 +318,7 @@ impl Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         {
@@ -328,6 +339,7 @@ impl Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         let tmp = Fp::montgomery_reduce(
@@ -393,6 +405,7 @@ impl Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         return d0 * R2 + d1 * R3;
@@ -416,6 +429,7 @@ impl Fp {
             not(target_os = "zkvm"),
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         ))]
         let tmp = Fp::montgomery_reduce(
@@ -447,7 +461,14 @@ impl Fp {
         Fp(v)
     }
 
+    #[inline]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    pub const fn to_u64(&self) -> [u64; 6] {
+        self.0
+    }
+
     /// CPU version of the exponentiation operation. Necessary to prevent syscalls in unconstrained mode.
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     pub(crate) fn cpu_pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -481,6 +502,7 @@ impl Fp {
 
     #[inline]
     /// CPU version of the square-root operation. Necessary to prevent syscalls in unconstrained mode.
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     pub(crate) fn cpu_sqrt(&self) -> CtOption<Self> {
         // We use Shank's method, as p = 3 (mod 4). This means
         // we only need to exponentiate by (p+1)/4. This only
@@ -594,10 +616,34 @@ impl Fp {
                 }
             }
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            if self.is_zero().into() {
+                return CtOption::new(Self::zero(), Choice::from(1u8));
+            }
+
+            let mut out = self.clone();
+            out.mul_r_inv_internal();
+
+            let mut is_qr: u8 = 0;
+            unsafe {
+                sqrt_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, &mut is_qr as *mut u8);
+            }
+
+            if is_qr == 1 {
+                out.mul_r_internal();
+                CtOption::new(out, Choice::from(1u8))
+            } else {
+                CtOption::new(Fp::zero(), Choice::from(0u8))
+            }
+        }
     }
 
     #[inline]
     /// CPU version of the inversion operation. Necessary to prevent syscalls in unconstrained mode.
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     pub(crate) fn cpu_invert(&self) -> CtOption<Self> {
         // Exponentiate by p - 2
         let inv = self.cpu_pow_vartime(&[
@@ -686,6 +732,22 @@ impl Fp {
 
             CtOption::new(inv, (self * inv).ct_eq(&Fp::one()))
         }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            if self.is_zero().into() {
+                return CtOption::new(Self::zero(), Choice::from(0u8));
+            }
+
+            let mut out = self.clone();
+            out.mul_r_inv_internal();
+            unsafe {
+                inv_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
+            }
+            out.mul_r_internal();
+
+            CtOption::new(out, Choice::from(1u8))
+        }
     }
 
     #[inline]
@@ -768,6 +830,16 @@ impl Fp {
             }
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                add_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
+            }
+            out
+        }
     }
 
     #[cfg(all(target_os = "zkvm", target_vendor = "risc0", feature = "zkvm-risc0"))]
@@ -835,6 +907,16 @@ impl Fp {
             }
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                neg_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
+            }
+            out
+        }
     }
 
     #[inline]
@@ -890,6 +972,16 @@ impl Fp {
                     out.0.as_mut_ptr() as *mut u32,
                     rhs.0.as_ptr() as *const u32,
                 );
+            }
+            out
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                sub_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
             }
             out
         }
@@ -1190,6 +1282,17 @@ impl Fp {
             out.mul_r_inv_internal();
             out
         }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                mul_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64, rhs.0.as_ptr() as *const u64);
+            }
+            out.mul_r_inv_internal();
+            out
+        }
     }
 
     /// Internal function to multiply the internal representation by `R_INV`, equivalent to transforming from
@@ -1201,16 +1304,39 @@ impl Fp {
         any(
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         )
     ))]
     pub(crate) fn mul_r_inv_internal(&mut self) {
-        unsafe {
-            syscall_bls12381_fp_mulmod(
-                self.0.as_mut_ptr() as *mut u32,
-                R_INV.0.as_ptr() as *const u32,
-            );
+        // non-Zisk
+        #[cfg(not(target_vendor = "zisk"))]
+        {
+            unsafe {
+                syscall_bls12381_fp_mulmod(
+                    self.0.as_mut_ptr() as *mut u32,
+                    R_INV.0.as_ptr() as *const u32,
+                );
+            }
         }
+
+        // Zisk
+        #[cfg(target_vendor = "zisk")]
+        {
+            unsafe {
+                mul_fp_bls12_381_ptr(
+                    self.0.as_mut_ptr() as *mut u64,
+                    R_INV.0.as_ptr() as *const u64,
+                );
+            }
+        }
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+    pub(crate) fn mul_r_inv(&self) -> Fp {
+        Fp(mul_fp_bls12_381(&self.0, &R_INV.0))
     }
 
     /// Internal function to multiply the internal representation by `R`, equivalent to transforming from
@@ -1222,12 +1348,28 @@ impl Fp {
         any(
             target_vendor = "succinct",
             target_vendor = "zkm",
+            target_vendor = "zisk",
             all(target_vendor = "risc0", feature = "zkvm-pico"),
         )
     ))]
     pub(crate) fn mul_r_internal(&mut self) {
-        unsafe {
-            syscall_bls12381_fp_mulmod(self.0.as_mut_ptr() as *mut u32, R.0.as_ptr() as *const u32);
+        // non-Zisk
+        #[cfg(not(target_vendor = "zisk"))]
+        {
+            unsafe {
+                syscall_bls12381_fp_mulmod(
+                    self.0.as_mut_ptr() as *mut u32,
+                    R.0.as_ptr() as *const u32,
+                );
+            }
+        }
+
+        // Zisk
+        #[cfg(target_vendor = "zisk")]
+        {
+            unsafe {
+                mul_fp_bls12_381_ptr(self.0.as_mut_ptr() as *mut u64, R.0.as_ptr() as *const u64);
+            }
         }
     }
 
@@ -1251,6 +1393,7 @@ impl Fp {
     }
 
     /// CPU version of the squaring operation. Necessary to prevent syscalls in unconstrained mode.
+    #[cfg(not(all(target_os = "zkvm", target_vendor = "zisk")))]
     pub(crate) fn cpu_square(&self) -> Self {
         let (t1, carry) = mac(0, self.0[0], self.0[1], 0);
         let (t2, carry) = mac(0, self.0[0], self.0[2], carry);
@@ -1334,6 +1477,17 @@ impl Fp {
                     out.0.as_mut_ptr() as *mut u32,
                     self.0.as_ptr() as *const u32,
                 );
+            }
+            out.mul_r_inv_internal();
+            out
+        }
+
+        // Zisk
+        #[cfg(all(target_os = "zkvm", target_vendor = "zisk"))]
+        {
+            let mut out = self.clone();
+            unsafe {
+                square_fp_bls12_381_ptr(out.0.as_mut_ptr() as *mut u64);
             }
             out.mul_r_inv_internal();
             out
